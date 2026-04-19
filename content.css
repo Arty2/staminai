@@ -1,0 +1,75 @@
+/* ── staminai · content.css ── v2.0 ─────────────────
+ *  The AI token stamina wheel for Claude
+ *  Dialectic Acheropoieton of Heracles Papatheodorou and Claude
+ *  MIT License · https://heracl.es/staminai
+ * ──────────────────────────────────────────────────── */
+
+#csw-root {
+  position: fixed;
+  z-index: 2147483646;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: auto;
+  bottom: 60px;
+  left: 16px;
+  transition: left 0.25s ease, bottom 0.25s ease;
+}
+
+#csw-wheel {
+  cursor: pointer;
+  position: relative;
+  border-radius: 50%;
+  background: hsl(var(--bg-100, 0 0% 8%));
+  transition: width 0.25s ease, height 0.25s ease;
+}
+#csw-wheel svg { display:block; width:100%; height:100%; overflow:visible; }
+#csw-wheel svg circle { transition: stroke .5s ease, stroke-dasharray .7s ease; }
+
+#csw-refresh-ring { opacity:0; transition:opacity .2s ease; }
+#csw-refresh-ring.csw-active { opacity:1; animation:csw-spin .8s linear infinite; }
+@keyframes csw-spin { to { transform:rotate(360deg); } }
+
+/* ── Tooltip ───────────────────────────────────────── */
+
+#csw-tip {
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%) translateX(4px) scale(0.96);
+  min-width: 190px;
+  padding: 10px 14px;
+  background: hsl(var(--bg-200, 0 0% 16%));
+  border: 1px solid hsl(var(--border-200, 0 0% 22%));
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  font-size: 12px;
+  line-height: 1.5;
+  color: hsl(var(--text-200, 0 0% 75%));
+  white-space: nowrap;
+}
+#csw-tip.csw-show {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0) scale(1);
+  pointer-events: auto;
+}
+#csw-tip .csw-row   { display:flex; align-items:center; gap:8px; padding:3px 0; }
+#csw-tip .csw-dot   { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+#csw-tip .csw-label  { flex:1; color:hsl(var(--text-300, 0 0% 50%)); font-size:11px; letter-spacing:.03em; }
+#csw-tip .csw-val    { font-variant-numeric:tabular-nums; font-weight:500; font-size:13px; }
+#csw-tip .csw-reset  {
+  color: hsl(var(--text-300, 0 0% 50%));
+  font-size: 10px;
+  padding-top: 4px;
+  border-top: 1px solid hsl(var(--border-200, 0 0% 22%));
+  margin-top: 4px;
+}
+
+/* ── States ────────────────────────────────────────── */
+
+#csw-wheel.csw-loading svg circle,
+#csw-wheel.csw-loading svg text { opacity: 0.25; }
+#csw-wheel.csw-error svg circle { stroke: hsl(0 60% 45%) !important; }

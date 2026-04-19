@@ -1,0 +1,50 @@
+name: Build & Release
+
+on:
+    push:
+        branches: [main]
+        tags: ["v*"]
+    # pull_request:
+    #   branches: [main]
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Build extensions
+              run: |
+                  chmod +x build.sh
+                  ./build.sh all
+
+            - name: Upload Firefox artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: staminai-firefox
+                  path: dist/staminai-firefox.xpi
+
+            - name: Upload Chromium artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: staminai-chromium
+                  path: dist/staminai-chromium.zip
+
+    release:
+        needs: build
+        if: startsWith(github.ref, 'refs/tags/v')
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            - uses: actions/download-artifact@v4
+              with:
+                  path: artifacts
+
+            - name: Create release
+              uses: softprops/action-gh-release@v2
+              with:
+                  generate_release_notes: true
+                  files: |
+                      artifacts/staminai-firefox/staminai-firefox.xpi
+                      artifacts/staminai-chromium/staminai-chromium.zip
