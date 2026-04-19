@@ -8,7 +8,7 @@
   "use strict";
 
   const FADE_MS = 4000, DEBOUNCE_MS = 3000;
-  const FALLBACK_SIZE = 24, AVATAR_GAP = 8, SIZE_SCALE = 0.72;
+  const FALLBACK_SIZE = 24, AVATAR_GAP = 8, SIZE_SCALE = 0.72, MIN_SIZE = 20;
 
   const S_SESSION = 3.5;             // inner ring
   const S_WEEKLY  = S_SESSION * 0.5; // middle ring
@@ -96,52 +96,68 @@
     const dC = design ? palette(dU) : { stroke: "rgba(255,255,255,0.06)" };
     const hasDesign = design !== null;
 
-    svg.innerHTML = `
-      <circle cx="${cx}" cy="${cy}" r="${rWeekly}"
-        fill="none" stroke="${TRACK}" stroke-width="${S_WEEKLY}"/>
-      <circle cx="${cx}" cy="${cy}" r="${rSession}"
-        fill="none" stroke="${TRACK}" stroke-width="${S_SESSION}"/>
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
 
-      <circle cx="${cx}" cy="${cy}" r="${rDesign}"
-        fill="none" stroke="${TRACK}" stroke-width="${S_DESIGN}"
-        stroke-dasharray="1.5 3" stroke-linecap="round"/>
+    svg.appendChild(svgEl("circle", {
+      cx, cy, r: rWeekly, fill: "none", stroke: TRACK, "stroke-width": S_WEEKLY
+    }));
+    svg.appendChild(svgEl("circle", {
+      cx, cy, r: rSession, fill: "none", stroke: TRACK, "stroke-width": S_SESSION
+    }));
+    svg.appendChild(svgEl("circle", {
+      cx, cy, r: rDesign, fill: "none", stroke: TRACK, "stroke-width": S_DESIGN,
+      "stroke-dasharray": "1.5 3", "stroke-linecap": "round"
+    }));
 
-      ${hasDesign && dR > 0.5 ? `
-      <circle cx="${cx}" cy="${cy}" r="${rDesign}"
-        fill="none" stroke="${dC.stroke}" stroke-width="${S_DESIGN}"
-        stroke-linecap="round"
-        stroke-dasharray="1.5 3"
-        stroke-dashoffset="${-((1 - dR / 100) * cD)}"
-        pathLength="${cD}"
-        transform="rotate(-90 ${cx} ${cy})"
-        opacity="0.8"/>` : ""}
+    if (hasDesign && dR > 0.5) {
+      svg.appendChild(svgEl("circle", {
+        cx, cy, r: rDesign, fill: "none", stroke: dC.stroke, "stroke-width": S_DESIGN,
+        "stroke-linecap": "round", "stroke-dasharray": "1.5 3",
+        "stroke-dashoffset": -((1 - dR / 100) * cD),
+        pathLength: cD,
+        transform: `rotate(-90 ${cx} ${cy})`,
+        opacity: "0.8"
+      }));
+    }
 
-      <circle cx="${cx}" cy="${cy}" r="${rWeekly}"
-        fill="none" stroke="${wC.stroke}" stroke-width="${S_WEEKLY}"
-        stroke-linecap="round"
-        stroke-dasharray="${(wR / 100) * cW} ${cW}"
-        transform="rotate(-90 ${cx} ${cy})"/>
+    svg.appendChild(svgEl("circle", {
+      cx, cy, r: rWeekly, fill: "none", stroke: wC.stroke, "stroke-width": S_WEEKLY,
+      "stroke-linecap": "round",
+      "stroke-dasharray": `${(wR / 100) * cW} ${cW}`,
+      transform: `rotate(-90 ${cx} ${cy})`
+    }));
 
-      <circle cx="${cx}" cy="${cy}" r="${rSession}"
-        fill="none" stroke="${sC.stroke}" stroke-width="${S_SESSION}"
-        stroke-linecap="round"
-        stroke-dasharray="${(sR / 100) * cS} ${cS}"
-        transform="rotate(-90 ${cx} ${cy})"/>
+    svg.appendChild(svgEl("circle", {
+      cx, cy, r: rSession, fill: "none", stroke: sC.stroke, "stroke-width": S_SESSION,
+      "stroke-linecap": "round",
+      "stroke-dasharray": `${(sR / 100) * cS} ${cS}`,
+      transform: `rotate(-90 ${cx} ${cy})`
+    }));
 
-      <g id="csw-refresh-ring">
-        <circle cx="${cx}" cy="${cy}" r="${rR}"
-          fill="none" stroke="${REFRESH_CLR}" stroke-width="1.5"
-          stroke-linecap="round"
-          stroke-dasharray="${cR * 0.15} ${cR * 0.85}"
-          transform-origin="${cx} ${cy}"/>
-      </g>
+    const refreshG = svgEl("g", { id: "csw-refresh-ring" });
+    refreshG.appendChild(svgEl("circle", {
+      cx, cy, r: rR, fill: "none", stroke: REFRESH_CLR, "stroke-width": "1.5",
+      "stroke-linecap": "round",
+      "stroke-dasharray": `${cR * 0.15} ${cR * 0.85}`,
+      "transform-origin": `${cx} ${cy}`
+    }));
+    svg.appendChild(refreshG);
 
-      <text x="${cx}" y="${cy + 0.5}"
-        text-anchor="middle" dominant-baseline="central"
-        font-size="10" font-weight="600" fill="${sC.stroke}"
-        font-family="inherit" letter-spacing="-0.01em"
-        opacity="0.85">${displayValue(sR)}</text>
-    `;
+    const label = svgEl("text", {
+      x: cx, y: cy + 0.5,
+      "text-anchor": "middle", "dominant-baseline": "central",
+      "font-size": "10", "font-weight": "600", fill: sC.stroke,
+      "font-family": "inherit", "letter-spacing": "-0.01em",
+      opacity: "0.85"
+    });
+    label.textContent = displayValue(sR);
+    svg.appendChild(label);
+  }
+
+  function svgEl(tag, attrs) {
+    const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
   }
 
   function renderTip(five, seven, raw) {
@@ -162,37 +178,52 @@
       return h > 0 ? `${h}h ${m % 60}m` : `${m}m`;
     };
 
-    const orgHeader = orgName
-      ? `<div class="csw-org">${escapeHtml(orgName)}</div>`
-      : "";
+    while (tip.firstChild) tip.removeChild(tip.firstChild);
 
-    tip.innerHTML = `
-      ${orgHeader}
-      <div class="csw-row">
-        <span class="csw-dot" style="background:${sC.stroke}"></span>
-        <span class="csw-label">Session</span>
-        <span class="csw-val" style="color:${sC.stroke}">${Math.round(100 - sU)}%</span>
-      </div>
-      <div class="csw-row">
-        <span class="csw-dot" style="background:${wC.stroke}"></span>
-        <span class="csw-label">Weekly</span>
-        <span class="csw-val" style="color:${wC.stroke}">${Math.round(100 - wU)}%</span>
-      </div>
-      <div class="csw-row">
-        <span class="csw-dot" style="background:${dC.stroke};${dU === null ? "opacity:0.3" : ""}"></span>
-        <span class="csw-label">Design</span>
-        <span class="csw-val" style="color:${dC.stroke}">${dU !== null ? Math.round(100 - dU) + "%" : "\u2014"}</span>
-      </div>
-      <div class="csw-reset">
-        Session resets in ${fmt(five?.resets_at)}<br>
-        Weekly resets in ${fmt(seven?.resets_at)}${design?.resets_at ? "<br>Design resets in " + fmt(design.resets_at) : ""}
-      </div>`;
+    if (orgName) {
+      const orgDiv = document.createElement("div");
+      orgDiv.className = "csw-org";
+      orgDiv.textContent = orgName;
+      tip.appendChild(orgDiv);
+    }
+
+    tip.appendChild(tipRow(sC.stroke, "Session", `${Math.round(100 - sU)}%`, sC.stroke));
+    tip.appendChild(tipRow(wC.stroke, "Weekly", `${Math.round(100 - wU)}%`, wC.stroke));
+    tip.appendChild(tipRow(
+      dC.stroke, "Design",
+      dU !== null ? `${Math.round(100 - dU)}%` : "\u2014",
+      dC.stroke,
+      dU === null
+    ));
+
+    const reset = document.createElement("div");
+    reset.className = "csw-reset";
+    reset.appendChild(document.createTextNode(`Session resets in ${fmt(five?.resets_at)}`));
+    reset.appendChild(document.createElement("br"));
+    reset.appendChild(document.createTextNode(`Weekly resets in ${fmt(seven?.resets_at)}`));
+    if (design?.resets_at) {
+      reset.appendChild(document.createElement("br"));
+      reset.appendChild(document.createTextNode(`Design resets in ${fmt(design.resets_at)}`));
+    }
+    tip.appendChild(reset);
   }
 
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, (c) => ({
-      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-    }[c]));
+  function tipRow(dotColor, label, valueText, valueColor, dotDimmed) {
+    const row = document.createElement("div");
+    row.className = "csw-row";
+    const dot = document.createElement("span");
+    dot.className = "csw-dot";
+    dot.style.background = dotColor;
+    if (dotDimmed) dot.style.opacity = "0.3";
+    const lbl = document.createElement("span");
+    lbl.className = "csw-label";
+    lbl.textContent = label;
+    const val = document.createElement("span");
+    val.className = "csw-val";
+    val.style.color = valueColor;
+    val.textContent = valueText;
+    row.append(dot, lbl, val);
+    return row;
   }
 
   function setRefreshing(on) {
@@ -210,7 +241,9 @@
     const av = findAvatar(); if (!av) return;
     const r = av.getBoundingClientRect();
     const avatarSize = Math.round(Math.max(r.width, r.height));
-    const size = Math.round(avatarSize * SIZE_SCALE);
+    if (avatarSize <= 0) return;
+    const scaled = Math.round(avatarSize * SIZE_SCALE);
+    const size = Math.min(avatarSize, Math.max(MIN_SIZE, scaled));
     if (size > 0 && size !== curSize) {
       curSize = size;
       renderWheel(data?.five_hour, data?.seven_day, data);
