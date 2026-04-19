@@ -4,6 +4,10 @@ The AI token stamina wheel for [Claude](https://claude.ai).
 
 A browser extension that floats a compact stamina wheel above your avatar in the Claude sidebar, showing your session, weekly, and Claude Design usage limits at a glance.
 
+- [Website](https://heracl.es/staminai)
+- [Source](https://git.heracl.es/staminai)
+- [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/staminai/)
+
 ## How it looks like
 
 A circular widget with three concentric rings, located above the account avatar. Hover the wheel to see a tooltip with exact percentages and reset countdowns for all three limits.
@@ -43,11 +47,11 @@ This is a lightweight JSON call. No tokens are consumed, no API credits are spen
 ## Install
 
 > [!NOTE]
-> Currently not published in either [Firefox Add-ons](https://addons.mozilla.org) or Chrome / Edge Add-on stores.
+> Pending public listing in [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/staminai/). Currently not published in Chrome / Edge Add-on stores.
 
 ### Firefox
 
-1. Download `staminai-firefox.xpi` from [Releases](./releases)
+1. Download `staminai-firefox.xpi` from [Releases](https://github.com/Arty2/staminai/releases)
 2. Go to `about:debugging#/runtime/this-firefox`
 3. Click **Load Temporary Add-on** → select the `.xpi`
 
@@ -55,14 +59,14 @@ For permanent install, you may self-sign with [`web-ext sign`](https://extension
 
 ### Chrome / Edge
 
-1. Download `staminai-chromium.zip` from [Releases](./releases)
+1. Download `staminai-chromium.zip` from [Releases](https://github.com/Arty2/staminai/releases)
 2. Unzip
 3. Go to `chrome://extensions` → enable **Developer mode**
 4. Click **Load unpacked** → select the unzipped folder
 
 ### Greasemonkey / Tampermonkey / Violentmonkey
 
-1. Download `staminai.user.js` from [Releases](./releases)
+1. Download `staminai.user.js` from [Releases](https://github.com/Arty2/staminai/releases)
 2. Open it in a browser that has a userscript manager installed — the manager will prompt to install
 3. Confirm install
 
