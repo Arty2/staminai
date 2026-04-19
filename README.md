@@ -23,10 +23,12 @@ From outside in, the rings visualize:
 ## When does it refresh?
 
 - **On hover** — hovering the wheel triggers a refresh
-- **On chatbox focus** — clicking or focusing the message composer refreshes
+- **On chatbox focus or click** — focusing or clicking the message composer refreshes (document-level event delegation — no observers, no polling)
 - **On page load** — fetches once when Claude loads
 
-All refreshes are debounced at 3 seconds. The refresh indicator (spinning ring outside the wheel) shows when a fetch is in flight.
+All refreshes are debounced at 3 seconds and skipped entirely when the tab is backgrounded. The refresh indicator (spinning ring outside the wheel) shows when a fetch is in flight.
+
+If Claude's API rate-limits us (HTTP 429), staminai backs off on a `1 min → 5 min → 15 min` ladder. 5xx responses trigger a 30-second cooldown. A `Retry-After` header overrides both if it asks for longer.
 
 ## Does this cost anything?
 
@@ -58,19 +60,28 @@ For permanent install, you may self-sign with [`web-ext sign`](https://extension
 3. Go to `chrome://extensions` → enable **Developer mode**
 4. Click **Load unpacked** → select the unzipped folder
 
+### Greasemonkey / Tampermonkey / Violentmonkey
+
+1. Download `staminai.user.js` from [Releases](./releases)
+2. Open it in a browser that has a userscript manager installed — the manager will prompt to install
+3. Confirm install
+
+No `@grant` permissions are required; CSS is injected as an inline `<style>` tag.
+
 ## Build from source
 
 ```bash
 ./build.sh
 ```
 
-Produces `dist/staminai-firefox.xpi` and `dist/staminai-chromium.zip`.
+Produces `dist/staminai-firefox.xpi`, `dist/staminai-chromium.zip`, and `dist/staminai.user.js`.
 
 Or build individually:
 
 ```bash
 ./build.sh firefox
 ./build.sh chromium
+./build.sh userscript
 ```
 
 ## Project structure
@@ -83,7 +94,8 @@ staminai/
 ├── icons/            # Extension icons (16/32/48/128px)
 ├── screenshots/      # Browser screenshots
 ├── LICENSE           # MIT
-├── build.sh          # Build script
+├── build.sh          # Build script (MV3 zips + .user.js userscript)
+├── CHANGELOG.md
 └── README.md
 ```
 
@@ -91,7 +103,7 @@ staminai/
 
 ### Positioning
 
-The extension finds the avatar button in Claude's sidebar via `data-testid` and `aria-label` selectors. It reads `getBoundingClientRect()` and positions the wheel centered above it at 72% of the avatar's diameter. Falls back to a heuristic scan of circular buttons near the bottom of `<nav>` / `<aside>`.
+The extension finds the avatar button in Claude's sidebar via `button[data-testid*="user-menu-button"]` (partial-attribute match, so it survives minor `data-testid` renames). It reads `getBoundingClientRect()` and positions the wheel centered above the avatar at 72% of its diameter. Re-anchoring happens on page load, `window.resize`, wheel hover, and chatbox focus/click — there is no polling loop or `MutationObserver`.
 
 ### Theming
 
@@ -129,9 +141,7 @@ Yes — Pro, Max, Team, Enterprise. The usage endpoint returns data for whatever
 
 ## To-Do
 
-- [ ] Replace `orgs[0]` logic: - detect active org from current Claude workspace state - show current org name in tooltip - re-resolve on workspace switch
-- [ ] Add backoff on errors: - 429: back off for 1, 5, 15 minutes - 5xx: temporary cooldown
-- [ ] Reduce refresh triggers, prefer `MutationObserver` /`ResizeObserver` instead of DOM polling: - keep page-load refresh - keep manual hover refresh - remove chatbox click refresh, keep focus only - only refresh when tab is visible, skip if page is backgrounded
+Nothing outstanding right now — see [CHANGELOG.md](./CHANGELOG.md) for recent changes. File an issue if something's broken or missing.
 
 ***
 
