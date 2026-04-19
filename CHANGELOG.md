@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [2.1.1] — 2026-04-19
 
 ### Fixed
-- **Firefox addon validation.** Added the `data_collection_permissions` key (`"required": ["none"]`) to `browser_specific_settings.gecko` — now required by AMO for all new submissions. The wheel renders the user's own usage numbers; it transmits nothing back.
+- **Firefox addon validation.** Added the `data_collection_permissions` key (`"required": ["none"]`) to `browser_specific_settings.gecko` — now required by AMO for all new submissions. The wheel renders the user's own usage numbers; it transmits nothing back. `strict_min_version` bumped from 109.0 → 140.0 since `data_collection_permissions` ships in Firefox 140.
 - **No more `innerHTML` on dynamic content.** `renderWheel` now builds the SVG with `createElementNS`, and `renderTip` builds the tooltip with `createElement` + `textContent`. Resolves two "Unsafe assignment to innerHTML" linter warnings in `content.js` and removes the need for the `escapeHtml` helper.
 - **Wheel size clamp.** The wheel now never exceeds the avatar it's anchored to, and has a minimum size of 20px.
 
