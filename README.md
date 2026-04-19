@@ -4,19 +4,21 @@ The AI token stamina wheel for [Claude](https://claude.ai).
 
 A browser extension that floats a compact stamina wheel above your avatar in the Claude sidebar, showing your session, weekly, and Claude Design usage limits at a glance.
 
-## What it shows
+## How it looks like
 
-Three concentric rings, from outside in:
+A circular widget with three concentric rings, located above the account avatar. Hover the wheel to see a tooltip with exact percentages and reset countdowns for all three limits.
+
+![](./screenshots/staminai-screenshot_01.png)
+
+Colors shift green → yellow → orange → red as you consume capacity. The center displays remaining session percentage — or `%` when at 100% (full stamina).
+
+From outside in, the rings visualize:
 
 | Ring | Style | Data |
 |---|---|---|
 | **Design** | Dotted, 1px | Claude Design weekly limit |
 | **Weekly** | Solid, thin | 7-day rolling cap |
 | **Session** | Solid, thick | 5-hour session window |
-
-Colors shift green → yellow → orange → red as you consume capacity. The center displays remaining session percentage — or `%` when at 100% (full stamina).
-
-Hover the wheel to see a tooltip with exact percentages and reset countdowns for all three limits.
 
 ## When does it refresh?
 
@@ -79,6 +81,7 @@ staminai/
 ├── content.js        # Wheel logic, avatar anchoring, usage API
 ├── content.css       # Styling — uses Claude's own CSS variables
 ├── icons/            # Extension icons (16/32/48/128px)
+├── screenshots/      # Browser screenshots
 ├── LICENSE           # MIT
 ├── build.sh          # Build script
 └── README.md
@@ -88,7 +91,7 @@ staminai/
 
 ### Positioning
 
-staminai finds the avatar button in Claude's sidebar via `data-testid` and `aria-label` selectors. It reads `getBoundingClientRect()` and positions the wheel centered above it at 72% of the avatar's diameter. Falls back to a heuristic scan of circular buttons near the bottom of `<nav>` / `<aside>`.
+The extension finds the avatar button in Claude's sidebar via `data-testid` and `aria-label` selectors. It reads `getBoundingClientRect()` and positions the wheel centered above it at 72% of the avatar's diameter. Falls back to a heuristic scan of circular buttons near the bottom of `<nav>` / `<aside>`.
 
 ### Theming
 
