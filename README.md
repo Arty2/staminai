@@ -38,17 +38,20 @@ This is a lightweight JSON call. No tokens are consumed, no API credits are spen
 
 ## Install
 
+> [!NOTE]
+> Currently not published in either [Firefox Add-ons](https://addons.mozilla.org) or Chrome / Edge Add-on stores.
+
 ### Firefox
 
-1. Download `staminai-firefox.xpi` from [Releases](https://github.com/nicholasgasior/staminai/releases)
+1. Download `staminai-firefox.xpi` from [Releases](./releases)
 2. Go to `about:debugging#/runtime/this-firefox`
 3. Click **Load Temporary Add-on** → select the `.xpi`
 
-For permanent install, submit to [AMO](https://addons.mozilla.org) or self-sign with [`web-ext sign`](https://extensionworkshop.com/documentation/develop/web-ext-command-reference/#web-ext-sign).
+For permanent install, you may self-sign with [`web-ext sign`](https://extensionworkshop.com/documentation/develop/web-ext-command-reference/#web-ext-sign).
 
 ### Chrome / Edge
 
-1. Download `staminai-chromium.zip` from [Releases](https://github.com/nicholasgasior/staminai/releases)
+1. Download `staminai-chromium.zip` from [Releases](./releases)
 2. Unzip
 3. Go to `chrome://extensions` → enable **Developer mode**
 4. Click **Load unpacked** → select the unzipped folder
@@ -120,6 +123,12 @@ Claude hasn't exposed a separate Design quota in the usage API for your plan yet
 
 **Does it work with all plans?**
 Yes — Pro, Max, Team, Enterprise. The usage endpoint returns data for whatever plan your session is on.
+
+## To-Do
+
+- [ ] Replace `orgs[0]` logic: - detect active org from current Claude workspace state - show current org name in tooltip - re-resolve on workspace switch
+- [ ] Add backoff on errors: - 429: back off for 1, 5, 15 minutes - 5xx: temporary cooldown
+- [ ] Reduce refresh triggers, prefer `MutationObserver` /`ResizeObserver` instead of DOM polling: - keep page-load refresh - keep manual hover refresh - remove chatbox click refresh, keep focus only - only refresh when tab is visible, skip if page is backgrounded
 
 ***
 
