@@ -1,4 +1,4 @@
-/* ── staminai · content.js ─── v2.0 ─────────────────
+/* ── staminai · content.js ─── v2.1 ─────────────────
  *  The AI token stamina wheel for Claude
  *  Dialectic Acheropoieton of Heracles Papatheodorou and Claude
  *  MIT License · https://heracl.es/staminai
@@ -7,7 +7,7 @@
 (function () {
   "use strict";
 
-  const FADE_MS = 4000, ANCHOR_POLL_MS = 2000, DEBOUNCE_MS = 3000;
+  const FADE_MS = 4000, DEBOUNCE_MS = 3000;
   const FALLBACK_SIZE = 24, AVATAR_GAP = 8, SIZE_SCALE = 0.72;
 
   const S_SESSION = 3.5;             // inner ring
@@ -18,6 +18,10 @@
   const TRACK       = "rgba(255,255,255,0.07)";
   const REFRESH_CLR = "rgba(255,255,255,0.22)";
 
+  // Backoff ladder for HTTP 429, in ms
+  const BACKOFF_429 = [60_000, 300_000, 900_000];
+  const BACKOFF_5XX = 30_000;
+
   const palette = (pct) => {
     const r = 100 - pct;
     if (r > 50) return { stroke: "#5ec269" };
@@ -26,9 +30,9 @@
     return              { stroke: "#e84060" };
   };
 
-  let orgId = null, data = null, expanded = false;
+  let orgId = null, orgName = null, data = null, expanded = false;
   let fadeTimer = null, lastRefresh = 0, curSize = FALLBACK_SIZE;
-  let chatboxBound = false;
+  let cooldownUntil = 0, retry429Step = 0;
 
   const root = document.createElement("div");
   root.id = "csw-root";
@@ -46,7 +50,6 @@
   /* ── Extract design data from API response ─────────── */
 
   function getDesignUtil(raw) {
-    // Check possible field names the API may use
     const d = raw?.seven_day_design
            || raw?.design
            || raw?.seven_day_opus
@@ -70,7 +73,6 @@
 
     const cx = size / 2, cy = size / 2;
 
-    // Radii outside→in: design → weekly → session
     const rDesign  = cx - S_DESIGN / 2 - 0.5;
     const rWeekly  = rDesign - S_DESIGN / 2 - GAP - S_WEEKLY / 2;
     const rSession = rWeekly - S_WEEKLY / 2 - GAP - S_SESSION / 2;
@@ -79,7 +81,6 @@
     const cW = 2 * Math.PI * rWeekly;
     const cS = 2 * Math.PI * rSession;
 
-    // Refresh ring outside everything
     const rR = rDesign + S_DESIGN / 2 + 1.5;
     const cR = 2 * Math.PI * rR;
 
@@ -89,7 +90,6 @@
     const wR = Math.max(0, 100 - wU);
     const sC = palette(sU), wC = palette(wU);
 
-    // Design ring
     const design = getDesignUtil(raw);
     const dU = design?.utilization ?? 0;
     const dR = Math.max(0, 100 - dU);
@@ -97,18 +97,15 @@
     const hasDesign = design !== null;
 
     svg.innerHTML = `
-      <!-- Tracks -->
       <circle cx="${cx}" cy="${cy}" r="${rWeekly}"
         fill="none" stroke="${TRACK}" stroke-width="${S_WEEKLY}"/>
       <circle cx="${cx}" cy="${cy}" r="${rSession}"
         fill="none" stroke="${TRACK}" stroke-width="${S_SESSION}"/>
 
-      <!-- Design track (dotted, always visible) -->
       <circle cx="${cx}" cy="${cy}" r="${rDesign}"
         fill="none" stroke="${TRACK}" stroke-width="${S_DESIGN}"
         stroke-dasharray="1.5 3" stroke-linecap="round"/>
 
-      <!-- Design value (dotted arc, colored when data available) -->
       ${hasDesign && dR > 0.5 ? `
       <circle cx="${cx}" cy="${cy}" r="${rDesign}"
         fill="none" stroke="${dC.stroke}" stroke-width="${S_DESIGN}"
@@ -119,21 +116,18 @@
         transform="rotate(-90 ${cx} ${cy})"
         opacity="0.8"/>` : ""}
 
-      <!-- Weekly (middle, thin) -->
       <circle cx="${cx}" cy="${cy}" r="${rWeekly}"
         fill="none" stroke="${wC.stroke}" stroke-width="${S_WEEKLY}"
         stroke-linecap="round"
         stroke-dasharray="${(wR / 100) * cW} ${cW}"
         transform="rotate(-90 ${cx} ${cy})"/>
 
-      <!-- Session (inner, thick) -->
       <circle cx="${cx}" cy="${cy}" r="${rSession}"
         fill="none" stroke="${sC.stroke}" stroke-width="${S_SESSION}"
         stroke-linecap="round"
         stroke-dasharray="${(sR / 100) * cS} ${cS}"
         transform="rotate(-90 ${cx} ${cy})"/>
 
-      <!-- Refresh spinner -->
       <g id="csw-refresh-ring">
         <circle cx="${cx}" cy="${cy}" r="${rR}"
           fill="none" stroke="${REFRESH_CLR}" stroke-width="1.5"
@@ -142,7 +136,6 @@
           transform-origin="${cx} ${cy}"/>
       </g>
 
-      <!-- Center number -->
       <text x="${cx}" y="${cy + 0.5}"
         text-anchor="middle" dominant-baseline="central"
         font-size="10" font-weight="600" fill="${sC.stroke}"
@@ -169,7 +162,12 @@
       return h > 0 ? `${h}h ${m % 60}m` : `${m}m`;
     };
 
+    const orgHeader = orgName
+      ? `<div class="csw-org">${escapeHtml(orgName)}</div>`
+      : "";
+
     tip.innerHTML = `
+      ${orgHeader}
       <div class="csw-row">
         <span class="csw-dot" style="background:${sC.stroke}"></span>
         <span class="csw-label">Session</span>
@@ -191,6 +189,12 @@
       </div>`;
   }
 
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[c]));
+  }
+
   function setRefreshing(on) {
     const r = root.querySelector("#csw-refresh-ring");
     if (r) r.classList.toggle("csw-active", on);
@@ -198,26 +202,8 @@
 
   /* ── Avatar ────────────────────────────────────────── */
 
-  const AVATAR_SEL = [
-    'button[data-testid="user-button"]',
-    'button[data-testid="sidebar-user-menu"]',
-    'button[aria-label*="rofile"]',
-    'button[aria-label*="ccount"]',
-  ];
-
   function findAvatar() {
-    for (const sel of AVATAR_SEL) {
-      const el = document.querySelector(sel); if (el) return el;
-    }
-    const btns = document.querySelectorAll("nav button, aside button");
-    let best = null, bestY = -1;
-    for (const b of btns) {
-      const r = b.getBoundingClientRect(), d = Math.max(r.width, r.height);
-      if (d >= 20 && d <= 48 && r.bottom > window.innerHeight * 0.7 && r.bottom > bestY) {
-        bestY = r.bottom; best = b;
-      }
-    }
-    return best;
+    return document.querySelector('button[data-testid*="user-menu-button"]');
   }
 
   function anchorToAvatar() {
@@ -233,66 +219,106 @@
     root.style.bottom = Math.round(window.innerHeight - r.top + AVATAR_GAP) + "px";
   }
 
-  /* ── Chatbox focus ─────────────────────────────────── */
+  /* ── Chatbox ──────────────────────────────────────── */
 
-  const CHATBOX_SEL = ['textarea', '[contenteditable="true"]', '[role="textbox"]', 'div.ProseMirror'];
+  const CHATBOX_SEL = 'textarea, [contenteditable="true"], [role="textbox"], div.ProseMirror';
 
-  function findChatbox() {
-    for (const sel of CHATBOX_SEL) {
-      const el = document.querySelector(sel); if (el) return el;
-    }
-    return null;
+  function isChatbox(el) {
+    return el && el.nodeType === 1 && el.matches && el.matches(CHATBOX_SEL);
   }
 
+  /* ── Active org resolution ────────────────────────── */
+
+  function readCookieOrg() {
+    const m = document.cookie.match(/(?:^|;\s*)lastActiveOrg=([^;]+)/);
+    return m ? decodeURIComponent(m[1]) : null;
+  }
+
+  async function resolveActiveOrg() {
+    const cookieUuid = readCookieOrg();
+    try {
+      const res = await fetch("https://claude.ai/api/organizations", { credentials: "include" });
+      if (!res.ok) {
+        const err = new Error(res.status);
+        err.status = res.status;
+        throw err;
+      }
+      const orgs = await res.json();
+      if (!Array.isArray(orgs) || !orgs.length) return false;
+      const pick = (cookieUuid && orgs.find((o) => o.uuid === cookieUuid)) || orgs[0];
+      const changed = pick.uuid !== orgId;
+      orgId = pick.uuid;
+      orgName = pick.name || null;
+      return changed;
+    } catch (e) {
+      console.warn("[staminai] org resolve error:", e);
+      if (e && e.status) throw e;
+      return false;
+    }
+  }
+
+  /* ── Refresh w/ backoff ───────────────────────────── */
+
   function debouncedRefresh() {
+    if (document.visibilityState !== "visible") return;
     if (Date.now() - lastRefresh < DEBOUNCE_MS) return;
     lastRefresh = Date.now();
     triggerRefresh();
   }
 
-  function hookChatbox() {
-    if (chatboxBound) return;
-    const cb = findChatbox(); if (!cb) return;
-    cb.addEventListener("focus", debouncedRefresh, true);
-    cb.addEventListener("click", debouncedRefresh, true);
-    chatboxBound = true;
-    const obs = new MutationObserver(() => {
-      const current = findChatbox();
-      if (current && current !== cb) {
-        cb.removeEventListener("focus", debouncedRefresh, true);
-        cb.removeEventListener("click", debouncedRefresh, true);
-        chatboxBound = false;
-        hookChatbox();
-        obs.disconnect();
+  function applyBackoff(status, retryAfter) {
+    const now = Date.now();
+    let hdrMs = 0;
+    if (retryAfter) {
+      const n = Number(retryAfter);
+      if (!Number.isNaN(n)) hdrMs = n * 1000;
+      else {
+        const t = Date.parse(retryAfter);
+        if (!Number.isNaN(t)) hdrMs = Math.max(0, t - now);
       }
-    });
-    obs.observe(document.body, { childList: true, subtree: true });
-  }
-
-  /* ── API ───────────────────────────────────────────── */
-
-  async function getOrgId() {
-    if (orgId) return orgId;
-    try {
-      const res = await fetch("https://claude.ai/api/organizations", { credentials: "include" });
-      if (!res.ok) throw new Error(res.status);
-      const orgs = await res.json();
-      if (orgs?.length) orgId = orgs[0].uuid;
-      return orgId;
-    } catch (e) { console.warn("[staminai] orgId error:", e); return null; }
+    }
+    if (status === 429) {
+      const laddered = BACKOFF_429[Math.min(retry429Step, BACKOFF_429.length - 1)];
+      cooldownUntil = now + Math.max(hdrMs, laddered);
+      retry429Step = Math.min(retry429Step + 1, BACKOFF_429.length - 1);
+    } else if (status >= 500 && status < 600) {
+      cooldownUntil = now + Math.max(hdrMs, BACKOFF_5XX);
+    } else if (hdrMs > 0) {
+      cooldownUntil = now + hdrMs;
+    }
   }
 
   async function triggerRefresh() {
+    if (Date.now() < cooldownUntil) {
+      root.querySelector("#csw-wheel").classList.add("csw-error");
+      return;
+    }
     setRefreshing(true);
     const wheel = root.querySelector("#csw-wheel");
     try {
-      const oid = await getOrgId(); if (!oid) throw new Error("No orgId");
+      if (!orgId) await resolveActiveOrg();
+      else {
+        const cookieUuid = readCookieOrg();
+        if (cookieUuid && cookieUuid !== orgId) {
+          data = null;
+          await resolveActiveOrg();
+        }
+      }
+      if (!orgId) throw Object.assign(new Error("No orgId"), { status: 0 });
+
       const res = await fetch(
-        `https://claude.ai/api/organizations/${oid}/usage`,
+        `https://claude.ai/api/organizations/${orgId}/usage`,
         { credentials: "include" }
       );
-      if (!res.ok) throw new Error(res.status);
+      if (!res.ok) {
+        applyBackoff(res.status, res.headers.get("Retry-After"));
+        const err = new Error(res.status);
+        err.status = res.status;
+        throw err;
+      }
       data = await res.json();
+      retry429Step = 0;
+      cooldownUntil = 0;
       wheel.classList.remove("csw-loading", "csw-error");
       renderWheel(data.five_hour, data.seven_day, data);
       renderTip(data.five_hour, data.seven_day, data);
@@ -324,13 +350,12 @@
     wheel.classList.add("csw-loading");
     renderWheel(null, null, null);
 
-    // Hover: show tooltip + refresh
     wheel.addEventListener("mouseenter", () => {
+      anchorToAvatar();
       showTip(); schedFade();
       debouncedRefresh();
     });
 
-    // Click: just toggle tooltip
     wheel.addEventListener("click", (e) => {
       e.stopPropagation();
       expanded ? hideTip() : (showTip(), schedFade());
@@ -340,11 +365,18 @@
     root.addEventListener("mouseleave", () => { hideTip(); });
     document.addEventListener("click", (e) => { if (expanded && !root.contains(e.target)) hideTip(); });
 
-    triggerRefresh();
-    anchorToAvatar();
-    hookChatbox();
-    setInterval(() => { anchorToAvatar(); hookChatbox(); }, ANCHOR_POLL_MS);
+    // Event-delegated chatbox bindings (no observers, no polling)
+    document.addEventListener("focusin", (e) => {
+      if (isChatbox(e.target)) { anchorToAvatar(); debouncedRefresh(); }
+    }, true);
+    document.addEventListener("click", (e) => {
+      if (isChatbox(e.target)) { anchorToAvatar(); debouncedRefresh(); }
+    }, true);
+
     window.addEventListener("resize", anchorToAvatar);
+
+    anchorToAvatar();
+    triggerRefresh();
   }
 
   if (document.body) init(); else document.addEventListener("DOMContentLoaded", init);

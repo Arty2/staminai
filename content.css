@@ -1,4 +1,4 @@
-/* ── staminai · content.css ── v2.0 ─────────────────
+/* ── staminai · content.css ── v2.1 ─────────────────
  *  The AI token stamina wheel for Claude
  *  Dialectic Acheropoieton of Heracles Papatheodorou and Claude
  *  MIT License · https://heracl.es/staminai
@@ -55,6 +55,18 @@
   opacity: 1;
   transform: translateY(-50%) translateX(0) scale(1);
   pointer-events: auto;
+}
+#csw-tip .csw-org   {
+  font-size: 11px;
+  font-weight: 600;
+  color: hsl(var(--text-100, 0 0% 90%));
+  letter-spacing: .02em;
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid hsl(var(--border-200, 0 0% 22%));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
 }
 #csw-tip .csw-row   { display:flex; align-items:center; gap:8px; padding:3px 0; }
 #csw-tip .csw-dot   { width:8px; height:8px; border-radius:50%; flex-shrink:0; }

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "staminai",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "The AI token stamina wheel for Claude",
   "author": "Dialectic Acheropoieton of Heracles Papatheodorou and Claude",
   "homepage_url": "https://heracl.es/staminai",
