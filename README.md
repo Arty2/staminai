@@ -149,4 +149,4 @@ Nothing outstanding right now — see [CHANGELOG.md](./CHANGELOG.md) for recent 
 
 ***
 
-Dialectic Acheropoieton of Heracles Papatheodorou and Claude, MIT License
+Dialectic Acheiropoieton of Heracles Papatheodorou and Claude, MIT License
