@@ -1,4 +1,4 @@
-# [/staminai](https://heracl.es/staminai)
+# /staminai
 
 The AI token stamina wheel for [Claude](https://claude.ai).
 
