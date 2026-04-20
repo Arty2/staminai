@@ -1,25 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 35 35" width="35" height="35">
-  <g fill="#443830">
-    <rect x="-2" y="-1" width="4" height="2" rx="1" transform="translate(17.5,17.5) rotate(0) translate(0,-16.5)"/>
-    <rect x="-2" y="-1" width="4" height="2" rx="1" transform="translate(17.5,17.5) rotate(22.5) translate(0,-16.5)"/>
-    <rect x="-2" y="-1" width="4" height="2" rx="1" transform="translate(17.5,17.5) rotate(45) translate(0,-16.5)"/>
-    <rect x="-2" y="-1" width="4" height="2" rx="1" transform="translate(17.5,17.5) rotate(67.5) translate(0,-16.5)"/>
-    <rect x="-2" y="-1" width="4" height="2" rx="1" transform="translate(17.5,17.5) rotate(90) translate(0,-16.5)"/>
-    <rect x="-2" y="-1" width="4" height="2" rx="1" transform="translate(17.5,17.5) rotate(112.5) translate(0,-16.5)"/>
-    <rect x="-2" y="-1" width="4" height="2" rx="1" transform="translate(17.5,17.5) rotate(135) translate(0,-16.5)"/>
-    <rect x="-2" y="-1" width="4" height="2" rx="1" transform="translate(17.5,17.5) rotate(157.5) translate(0,-16.5)"/>
-    <rect x="-2" y="-1" width="4" height="2" rx="1" transform="translate(17.5,17.5) rotate(180) translate(0,-16.5)"/>
-    <rect x="-2" y="-1" width="4" height="2" rx="1" transform="translate(17.5,17.5) rotate(202.5) translate(0,-16.5)"/>
-    <rect x="-2" y="-1" width="4" height="2" rx="1" transform="translate(17.5,17.5) rotate(225) translate(0,-16.5)"/>
-    <rect x="-2" y="-1" width="4" height="2" rx="1" transform="translate(17.5,17.5) rotate(247.5) translate(0,-16.5)"/>
-    <rect x="-2" y="-1" width="4" height="2" rx="1" transform="translate(17.5,17.5) rotate(270) translate(0,-16.5)"/>
-    <rect x="-2" y="-1" width="4" height="2" rx="1" transform="translate(17.5,17.5) rotate(292.5) translate(0,-16.5)"/>
-    <rect x="-2" y="-1" width="4" height="2" rx="1" transform="translate(17.5,17.5) rotate(315) translate(0,-16.5)"/>
-    <rect x="-2" y="-1" width="4" height="2" rx="1" transform="translate(17.5,17.5) rotate(337.5) translate(0,-16.5)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <g fill="currentColor" stroke="none">
+    <rect x="-7.31" y="-3.66" width="14.63" height="7.31" rx="3.66" transform="translate(64,64) rotate(0) translate(0,-60.34)"/>
+    <rect x="-7.31" y="-3.66" width="14.63" height="7.31" rx="3.66" transform="translate(64,64) rotate(22.5) translate(0,-60.34)"/>
+    <rect x="-7.31" y="-3.66" width="14.63" height="7.31" rx="3.66" transform="translate(64,64) rotate(45) translate(0,-60.34)"/>
+    <rect x="-7.31" y="-3.66" width="14.63" height="7.31" rx="3.66" transform="translate(64,64) rotate(67.5) translate(0,-60.34)"/>
+    <rect x="-7.31" y="-3.66" width="14.63" height="7.31" rx="3.66" transform="translate(64,64) rotate(90) translate(0,-60.34)"/>
+    <rect x="-7.31" y="-3.66" width="14.63" height="7.31" rx="3.66" transform="translate(64,64) rotate(112.5) translate(0,-60.34)"/>
+    <rect x="-7.31" y="-3.66" width="14.63" height="7.31" rx="3.66" transform="translate(64,64) rotate(135) translate(0,-60.34)"/>
+    <rect x="-7.31" y="-3.66" width="14.63" height="7.31" rx="3.66" transform="translate(64,64) rotate(157.5) translate(0,-60.34)"/>
+    <rect x="-7.31" y="-3.66" width="14.63" height="7.31" rx="3.66" transform="translate(64,64) rotate(180) translate(0,-60.34)"/>
+    <rect x="-7.31" y="-3.66" width="14.63" height="7.31" rx="3.66" transform="translate(64,64) rotate(202.5) translate(0,-60.34)"/>
+    <rect x="-7.31" y="-3.66" width="14.63" height="7.31" rx="3.66" transform="translate(64,64) rotate(225) translate(0,-60.34)"/>
+    <rect x="-7.31" y="-3.66" width="14.63" height="7.31" rx="3.66" transform="translate(64,64) rotate(247.5) translate(0,-60.34)"/>
+    <rect x="-7.31" y="-3.66" width="14.63" height="7.31" rx="3.66" transform="translate(64,64) rotate(270) translate(0,-60.34)"/>
+    <rect x="-7.31" y="-3.66" width="14.63" height="7.31" rx="3.66" transform="translate(64,64) rotate(292.5) translate(0,-60.34)"/>
+    <rect x="-7.31" y="-3.66" width="14.63" height="7.31" rx="3.66" transform="translate(64,64) rotate(315) translate(0,-60.34)"/>
+    <rect x="-7.31" y="-3.66" width="14.63" height="7.31" rx="3.66" transform="translate(64,64) rotate(337.5) translate(0,-60.34)"/>
   </g>
-  <circle cx="17.5" cy="17.5" r="13.625" fill="none" stroke="#443830" stroke-width="1.75"/>
-  <circle cx="17.5" cy="17.5" r="9.5" fill="none" stroke="#443830" stroke-width="4.25"/>
-  <circle cx="17.5" cy="17.5" r="13.625" fill="none" stroke="#e8c840" stroke-width="1.75" stroke-linecap="round" stroke-dasharray="21.402 64.205" transform="rotate(-90 17.5 17.5)"/>
-  <circle cx="17.5" cy="17.5" r="9.5" fill="none" stroke="#5ec269" stroke-width="4.25" stroke-linecap="round" stroke-dasharray="44.768 14.923" transform="rotate(-90 17.5 17.5)"/>
-  <path fill="#5ec269" fill-rule="evenodd" opacity="0.92" d="M 20.7,15.0 L 19.4,13.9 L 14.3,20.0 L 15.6,21.1 Z M 12.2,14.7 A 2.5,2.5 0 1,1 17.2,14.7 A 2.5,2.5 0 1,1 12.2,14.7 Z M 13.96,14.7 A 0.74,0.74 0 1,1 15.44,14.7 A 0.74,0.74 0 1,1 13.96,14.7 Z M 17.8,20.3 A 2.5,2.5 0 1,1 22.8,20.3 A 2.5,2.5 0 1,1 17.8,20.3 Z M 19.56,20.3 A 0.74,0.74 0 1,1 21.04,20.3 A 0.74,0.74 0 1,1 19.56,20.3 Z"/>
+  <circle cx="64" cy="64" r="49.83" fill="none" stroke="currentColor" stroke-width="6.40"/>
+  <circle cx="64" cy="64" r="34.74" fill="none" stroke="currentColor" stroke-width="15.54"/>
+  <circle cx="64" cy="64" r="49.83" fill="none" stroke="#e8c840" stroke-width="6.40" stroke-linecap="round" stroke-dasharray="78.27 234.81" transform="rotate(-90 64 64)"/>
+  <circle cx="64" cy="64" r="34.74" fill="none" stroke="#5ec269" stroke-width="15.54" stroke-linecap="round" stroke-dasharray="163.70 54.57" transform="rotate(-90 64 64)"/>
+  <path fill="#5ec269" stroke="none" fill-rule="evenodd" opacity="0.92" d="M 75.70,54.86 L 70.95,50.83 L 52.30,73.14 L 57.05,77.17 Z M 44.62,53.76 A 9.14,9.14 0 1,1 62.90,53.76 A 9.14,9.14 0 1,1 44.62,53.76 Z M 51.05,53.76 A 2.71,2.71 0 1,1 56.47,53.76 A 2.71,2.71 0 1,1 51.05,53.76 Z M 65.10,74.24 A 9.14,9.14 0 1,1 83.38,74.24 A 9.14,9.14 0 1,1 65.10,74.24 Z M 71.53,74.24 A 2.71,2.71 0 1,1 76.95,74.24 A 2.71,2.71 0 1,1 71.53,74.24 Z"/>
 </svg>
