@@ -2,7 +2,7 @@
 
 The AI token stamina wheel for [Claude](https://claude.ai).
 
-A browser extension that floats a compact stamina wheel above your avatar in the Claude sidebar, showing your session, weekly, and Claude Design usage limits at a glance.
+A browser extension that floats a compact, draggable stamina wheel over Claude, showing your session, weekly, and Claude Design usage limits at a glance.
 
 - [Website](https://heracl.es/staminai)
 - [Source](https://git.heracl.es/staminai)
@@ -10,18 +10,20 @@ A browser extension that floats a compact stamina wheel above your avatar in the
 
 ## How it looks like
 
-A circular widget with three concentric rings, located above the account avatar. Hover the wheel to see a tooltip with exact percentages and reset countdowns for all three limits.
+A circular widget with three concentric rings, floating at the middle right of the window. Hover the wheel to see a tooltip with exact percentages and reset times for all three limits. Hold and drag it anywhere you like — it stays put across reloads.
 
 ![](./screenshots/staminai-screenshot_01.png)
 
 Colors shift green → yellow → orange → red as you consume capacity. The center displays remaining session percentage — or `%` when at 100% (full stamina).
+
+The whole widget is sized in viewport units (`clamp(28px, 2vw, 56px)`), so it scales with the window rather than sitting at a fixed pixel size.
 
 From outside in, the rings visualize:
 
 | Ring | Style | Data |
 |---|---|---|
 | **Design** | Dotted, 1px | Claude Design weekly limit |
-| **Weekly** | Solid, thin | 7-day rolling cap |
+| **Weekly** | Solid, medium | 7-day rolling cap |
 | **Session** | Solid, thick | 5-hour session window |
 
 ## When does it refresh?
@@ -86,7 +88,10 @@ Or build individually:
 ./build.sh firefox
 ./build.sh chromium
 ./build.sh userscript
+./build.sh clean
 ```
+
+Every target runs a preflight check first, failing early if a source file or a manifest-referenced icon is missing. See [CLAUDE.md](./CLAUDE.md) for build-system and contribution notes.
 
 ## Project structure
 
@@ -99,6 +104,7 @@ staminai/
 ├── screenshots/      # Browser screenshots
 ├── LICENSE           # MIT
 ├── build.sh          # Build script (MV3 zips + .user.js userscript)
+├── CLAUDE.md         # Contributor guidance + browser add-on practices
 ├── CHANGELOG.md
 └── README.md
 ```
@@ -107,7 +113,13 @@ staminai/
 
 ### Positioning
 
-The extension finds the avatar button in Claude's sidebar via `button[data-testid*="user-menu-button"]` (partial-attribute match, so it survives minor `data-testid` renames). It reads `getBoundingClientRect()` and positions the wheel centered above the avatar at 72% of its diameter. Re-anchoring happens on page load, `window.resize`, wheel hover, and chatbox focus/click — there is no polling loop or `MutationObserver`.
+The wheel floats free. It is positioned in viewport coordinates and anchored to no element in Claude's DOM, so a Claude UI change can never strand it. It defaults to the middle right and can be dragged anywhere; drags under 4px still register as a click, so the tooltip toggle is unaffected.
+
+The position is saved as a *fraction* of the available space rather than as raw pixels, so it restores proportionally at any window size and is clamped back on screen when the window shrinks. The tooltip flips to whichever side of the viewport has room and nudges itself vertically near the top and bottom edges.
+
+### Scaling
+
+The SVG lives in a fixed `0 0 100 100` coordinate space and is sized entirely by CSS via `--csw-size`. Every radius, stroke width and the center label are expressed as a percentage of the wheel, and the tooltip derives its type scale from `--csw-font` with `em` sizing throughout. Resizing the widget is a one-line CSS change; nothing is measured or resized in JavaScript.
 
 ### Theming
 
@@ -129,13 +141,16 @@ No background workers. No remote code. No storage. No cookies permission. Same-o
 
 - No data leaves your browser except to `claude.ai`
 - No analytics, telemetry, or third-party calls
-- No data is stored
-- ~200 lines JS, ~80 lines CSS — fully auditable
+- The only thing stored is where you dragged the wheel — a single `localStorage` key (`staminai:pos`) holding two numbers. No usage data is ever persisted.
+- ~525 lines JS, ~110 lines CSS — fully auditable
 
 ## FAQ
 
 **What does "%" mean in the wheel center?**
 100% remaining — full stamina, no usage consumed yet.
+
+**Can I move the wheel?**
+Yes — hold click and drag it anywhere. Its position is remembered per browser.
 
 **Why does the Design row show "—"?**
 Claude hasn't exposed a separate Design quota in the usage API for your plan yet. The ring and tooltip will populate automatically when it appears.
