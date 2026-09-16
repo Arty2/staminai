@@ -75,10 +75,13 @@ npx web-ext lint                          # AMO's own linter, if network is avai
   `localStorage`) so it survives resizes and restores sensibly on a different
   screen. Every write is wrapped in `try/catch` — `localStorage` throws in some
   private-browsing modes.
-- **Event-driven, never polling.** No `setInterval`, no `MutationObserver`.
-  Refreshes come from page load, wheel hover, and document-delegated
+- **Event-driven, never polling.** No `MutationObserver`, and nothing on a timer
+  fetches. Refreshes come from page load, wheel hover, and document-delegated
   `focusin`/`click` on the chatbox — debounced 3 s and skipped when the tab is
-  backgrounded.
+  backgrounded. The one `setInterval` in the codebase (`setTick`) repaints the
+  exhausted-state countdown, makes no network calls, is skipped while the tab is
+  backgrounded, and clears itself the moment the wheel returns to rings. Don't
+  add a second timer.
 - **Backoff is mandatory.** 429 climbs a 1/5/15-minute ladder; 5xx waits 30 s;
   `Retry-After` wins when it asks for longer. Never add a code path that hits
   `/api/organizations/*` without going through `triggerRefresh()`.
@@ -86,6 +89,35 @@ npx web-ext lint                          # AMO's own linter, if network is avai
   `DRAG_SLOP` px stays a click. `suppressClick` swallows the synthetic click
   that follows a real drag and is cleared on the next `pointerdown` so it can
   never go stale.
+- **The wheel carries no text in its normal state.** Exact numbers live in the
+  tooltip; the rings are the whole reading. The only text it ever shows is the
+  exhausted-state countdown.
+
+### Ring geometry
+
+`rSession` must stay **at or below `S_SESSION`**. The session arc has a round
+end cap of radius `S_SESSION / 2`, so once the stroke is thicker than the ring's
+own radius the cap overruns the centre hole and the arc curls over itself into a
+comma instead of tapering to a round tip. The current constants land `rSession`
+exactly on `S_SESSION` — the thickest the inner ring can be. If you thicken it
+further, widen `GAP` or thin the outer rings to compensate, and re-render the
+`full` / `mixed` / `critical` states before believing it looks right.
+
+The **design ring is dotted, and a dotted ring cannot carry progress in its own
+dash pattern** — putting a `stroke-dashoffset` on it just slides the dots around
+and shows no proportion at all. It is drawn as a full dotted ring masked by a
+plain arc, so the colour retracts around the ring exactly like the solid ones.
+The dot period is derived as `circumference / DESIGN_DOTS` so the pattern closes
+with no seam at the 3 o'clock start, and the mask arc is snapped to end in a gap
+so no dot is ever sliced in half.
+
+### Tolerating an unknown API shape
+
+`getDesignUtil` and `getCredits` both probe a list of candidate field names and
+return `null` when none match, because the usage endpoint is undocumented and
+has carried these under different keys. Callers render the Design row as `—` and
+omit the Credits row entirely when the lookup comes back empty. Keep new fields
+defensive in the same way — never index straight into a response.
 
 ## Best practices for browser add-ons
 

@@ -1,4 +1,4 @@
-/* ── staminai · content.js ─── v2.2 ─────────────────
+/* ── staminai · content.js ─── v2.3 ─────────────────
  *  The AI token stamina wheel for Claude
  *  Dialectic Acheropoieton of Heracles Papatheodorou and Claude
  *  MIT License · https://heracl.es/staminai
@@ -14,13 +14,20 @@
    * a percentage of the wheel, so the whole widget scales with the viewport. */
   const VB = 100;
 
-  const S_SESSION = 20;              // inner ring
-  const S_WEEKLY  = 11;              // middle ring
-  const S_DESIGN  = 5;               // outer ring (Claude Design)
-  const GAP       = 3;
+  /* Ring geometry. The layout below lands rSession exactly on S_SESSION, which
+   * is the constraint that matters: the round end cap has radius S_SESSION / 2,
+   * so any thicker and the cap overruns the centre hole and the arc curls over
+   * itself instead of tapering to a round tip. */
+  const S_SESSION = 15;              // inner ring
+  const S_WEEKLY  = 12;              // middle ring
+  const S_DESIGN  = 6;               // outer ring (Claude Design)
+  const GAP       = 4;
   const RIM       = 1.5;             // breathing room at the wheel edge
-  const LABEL_FS  = 24;              // center label, in viewBox units
-  const LABEL_R   = 15;              // solid disc the label sits on
+
+  const DESIGN_DOTS = 16;            // dots around the design ring
+  const DESIGN_DUTY = 0.42;          // fraction of each dot period that is ink
+  const CLOCK_FS    = 32;            // countdown type size, in viewBox units
+  const TICK_MS     = 30_000;        // countdown repaint cadence (no network)
 
   const EDGE_PAD = 8;                // keep this far from the viewport edge
   const DRAG_SLOP = 4;               // px of movement before a click becomes a drag
@@ -46,6 +53,7 @@
   let cooldownUntil = 0, retry429Step = 0;
   let frac = { fx: 1, fy: 0.5 };     // normalized position, default: middle right
   let suppressClick = false;
+  let blockedEnd = null, tickTimer = null;
 
   const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
 
@@ -56,11 +64,6 @@
     <div id="csw-wheel">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VB} ${VB}"></svg>
     </div>`;
-
-  function displayValue(remaining) {
-    const v = Math.round(remaining);
-    return v === 100 ? "%" : String(v);
-  }
 
   /* ── Extract design data from API response ─────────── */
 
@@ -74,6 +77,62 @@
       utilization: Math.min(d.utilization, 100),
       resets_at: d.resets_at || null
     };
+  }
+
+  /* ── Extract credit balance from API response ──────── */
+
+  /* The usage endpoint has carried this under several names; accept a bare
+   * number or an object, and render nothing at all when none of them match. */
+  function getCredits(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    const num = (v) => {
+      if (typeof v === "number" && Number.isFinite(v)) return v;
+      if (v && typeof v === "object") {
+        for (const k of ["available", "remaining", "balance", "amount", "credits"]) {
+          if (typeof v[k] === "number" && Number.isFinite(v[k])) return v[k];
+        }
+      }
+      return null;
+    };
+    for (const k of ["credits_available", "available_credits", "credits_remaining",
+                     "credit_balance", "extra_credits", "credits", "credit"]) {
+      const v = num(raw[k]);
+      if (v !== null) return Math.max(0, v);
+    }
+    return null;
+  }
+
+  /* ── Exhausted state ───────────────────────────────── */
+
+  /* When a limit that actually gates chatting is spent, the rings have nothing
+   * left to say — the only useful number is how long until it comes back. */
+  function blockedUntil(five, seven) {
+    const ends = [];
+    for (const lim of [five, seven]) {
+      if (!lim || !lim.resets_at) continue;
+      if (Math.min(lim.utilization ?? 0, 100) < 100) continue;
+      const t = new Date(lim.resets_at).getTime();
+      if (!Number.isNaN(t) && t > Date.now()) ends.push(t);
+    }
+    return ends.length ? Math.min(...ends) : null;
+  }
+
+  function fmtClock(ms) {
+    const mins = Math.max(0, Math.ceil(ms / 60000));
+    return `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
+  }
+
+  /* Repaints the countdown only while a limit is spent. No network, and it
+   * stands down the moment the wheel goes back to rings. */
+  function setTick(on) {
+    if (on && !tickTimer) tickTimer = setInterval(onTick, TICK_MS);
+    else if (!on && tickTimer) { clearInterval(tickTimer); tickTimer = null; }
+  }
+
+  function onTick() {
+    if (document.visibilityState !== "visible") return;
+    if (blockedEnd !== null && Date.now() >= blockedEnd) { triggerRefresh(); return; }
+    renderWheel(data?.five_hour, data?.seven_day, data);
   }
 
   /* ── SVG ───────────────────────────────────────────── */
@@ -91,7 +150,20 @@
     const cS = 2 * Math.PI * rSession;
 
     const rR = rDesign + S_DESIGN / 2 + 4;
-    const cR = 2 * Math.PI * rR;
+
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+    blockedEnd = blockedUntil(five, seven);
+    setTick(blockedEnd !== null);
+
+    if (blockedEnd !== null) {
+      svg.appendChild(svgEl("circle", {
+        cx, cy, r: rDesign, fill: "none", stroke: TRACK, "stroke-width": S_DESIGN
+      }));
+      renderClock(svg, cx, cy, blockedEnd);
+      svg.appendChild(refreshRing(cx, cy, rR));
+      return;
+    }
 
     const sU = Math.min(five?.utilization  ?? 0, 100);
     const wU = Math.min(seven?.utilization ?? 0, 100);
@@ -103,9 +175,12 @@
     const dU = design?.utilization ?? 0;
     const dR = Math.max(0, 100 - dU);
     const dC = design ? palette(dU) : { stroke: "rgba(255,255,255,0.06)" };
-    const hasDesign = design !== null;
 
-    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    /* Dot period divides the circumference exactly, so the pattern closes
+     * around the ring with no seam at the 3 o'clock start point. */
+    const period = cD / DESIGN_DOTS;
+    const ink = period * DESIGN_DUTY;
+    const dots = `${ink} ${period - ink}`;
 
     svg.appendChild(svgEl("circle", {
       cx, cy, r: rWeekly, fill: "none", stroke: TRACK, "stroke-width": S_WEEKLY
@@ -115,18 +190,40 @@
     }));
     svg.appendChild(svgEl("circle", {
       cx, cy, r: rDesign, fill: "none", stroke: TRACK, "stroke-width": S_DESIGN,
-      "stroke-dasharray": "7 12", "stroke-linecap": "round"
+      "stroke-dasharray": dots, "stroke-linecap": "round"
     }));
 
-    if (hasDesign && dR > 0.5) {
-      svg.appendChild(svgEl("circle", {
+    if (design && dR > 0.5) {
+      /* The dotted ring can't carry progress in its own dash pattern — that
+       * would just shift the dots. Draw the full dotted ring and mask it with
+       * a plain arc, so colour retracts around the ring like the others do. */
+      const whole = dR >= 99.5;
+      const colored = svgEl("circle", {
         cx, cy, r: rDesign, fill: "none", stroke: dC.stroke, "stroke-width": S_DESIGN,
-        "stroke-linecap": "round", "stroke-dasharray": "7 12",
-        "stroke-dashoffset": -((1 - dR / 100) * cD),
-        pathLength: cD,
-        transform: `rotate(-90 ${cx} ${cy})`,
-        opacity: "0.8"
-      }));
+        "stroke-linecap": "round", "stroke-dasharray": dots, opacity: "0.85"
+      });
+
+      if (!whole) {
+        // Snap the cut to a gap between dots so none is sliced in half.
+        const n = clamp(Math.round((dR / 100) * cD / period), 1, DESIGN_DOTS - 1);
+        const arc = n * period - (period - ink) / 2;
+
+        const mask = svgEl("mask", {
+          id: "csw-design-mask", maskUnits: "userSpaceOnUse",
+          x: -VB, y: -VB, width: VB * 3, height: VB * 3
+        });
+        mask.appendChild(svgEl("circle", {
+          cx, cy, r: rDesign, fill: "none", stroke: "#fff",
+          "stroke-width": S_DESIGN + 2,
+          "stroke-dasharray": `${arc} ${cD}`,
+          transform: `rotate(-90 ${cx} ${cy})`
+        }));
+        const defs = svgEl("defs", {});
+        defs.appendChild(mask);
+        svg.appendChild(defs);
+        colored.setAttribute("mask", "url(#csw-design-mask)");
+      }
+      svg.appendChild(colored);
     }
 
     svg.appendChild(svgEl("circle", {
@@ -143,28 +240,36 @@
       transform: `rotate(-90 ${cx} ${cy})`
     }));
 
-    const refreshG = svgEl("g", { id: "csw-refresh-ring" });
-    refreshG.appendChild(svgEl("circle", {
+    svg.appendChild(refreshRing(cx, cy, rR));
+  }
+
+  /* Hours:minutes until the spent limit comes back, filling the wheel in
+   * place of the rings. Type is sized to the string so a multi-day weekly
+   * reset ("168:00") fits the same circle as a session one. */
+  function renderClock(svg, cx, cy, until) {
+    const txt = fmtClock(until - Date.now());
+    const label = svgEl("text", {
+      x: cx, y: cy + 1,
+      "text-anchor": "middle", "dominant-baseline": "central",
+      "font-size": Math.min(CLOCK_FS, (VB - 14) / (0.56 * txt.length)),
+      "font-weight": "600", fill: palette(100).stroke,
+      "font-family": "inherit", "letter-spacing": "-0.02em",
+      "font-variant-numeric": "tabular-nums"
+    });
+    label.textContent = txt;
+    svg.appendChild(label);
+  }
+
+  function refreshRing(cx, cy, rR) {
+    const cR = 2 * Math.PI * rR;
+    const g = svgEl("g", { id: "csw-refresh-ring" });
+    g.appendChild(svgEl("circle", {
       cx, cy, r: rR, fill: "none", stroke: REFRESH_CLR, "stroke-width": "5",
       "stroke-linecap": "round",
       "stroke-dasharray": `${cR * 0.15} ${cR * 0.85}`,
       "transform-origin": `${cx} ${cy}`
     }));
-    svg.appendChild(refreshG);
-
-    svg.appendChild(svgEl("circle", {
-      cx, cy, r: LABEL_R, fill: "hsl(var(--bg-100, 0 0% 8%))", stroke: "none"
-    }));
-
-    const label = svgEl("text", {
-      x: cx, y: cy + 1,
-      "text-anchor": "middle", "dominant-baseline": "central",
-      "font-size": LABEL_FS, "font-weight": "600", fill: sC.stroke,
-      "font-family": "inherit", "letter-spacing": "-0.01em",
-      opacity: "0.85"
-    });
-    label.textContent = displayValue(sR);
-    svg.appendChild(label);
+    return g;
   }
 
   function svgEl(tag, attrs) {
@@ -222,6 +327,16 @@
       dC.stroke,
       dU === null
     ));
+
+    // No ring for credits — they're a balance, not a window.
+    const credits = getCredits(raw);
+    if (credits !== null) {
+      tip.appendChild(tipRow(
+        "#737373", "Credits",
+        credits.toLocaleString(undefined, { maximumFractionDigits: 2 }),
+        "hsl(var(--text-100, 0 0% 90%))"
+      ));
+    }
 
     const reset = document.createElement("div");
     reset.className = "csw-reset";

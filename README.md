@@ -14,7 +14,9 @@ A circular widget with three concentric rings, floating at the middle right of t
 
 ![](./screenshots/staminai-screenshot_01.png)
 
-Colors shift green → yellow → orange → red as you consume capacity. The center displays remaining session percentage — or `%` when at 100% (full stamina).
+Colors shift green → yellow → orange → red as you consume capacity. The wheel carries no text — the rings are the reading, and exact numbers live in the tooltip.
+
+When the session or weekly limit is fully spent, the rings give way to an `HH:MM` countdown to the reset, since that's the only number left worth showing.
 
 The whole widget is sized in viewport units (`clamp(28px, 2vw, 56px)`), so it scales with the window rather than sitting at a fixed pixel size.
 
@@ -26,13 +28,15 @@ From outside in, the rings visualize:
 | **Weekly** | Solid, medium | 7-day rolling cap |
 | **Session** | Solid, thick | 5-hour session window |
 
+Each arc tapers to a round tip whose diameter matches its ring thickness. The dotted Design ring retracts around the circle like the solid ones — it is drawn as a full dotted ring masked by an arc, rather than shifting its own dash pattern.
+
 ## When does it refresh?
 
 - **On hover** — hovering the wheel triggers a refresh
 - **On chatbox focus or click** — focusing or clicking the message composer refreshes (document-level event delegation — no observers, no polling)
 - **On page load** — fetches once when Claude loads
 
-All refreshes are debounced at 3 seconds and skipped entirely when the tab is backgrounded. The refresh indicator (spinning ring outside the wheel) shows when a fetch is in flight.
+All refreshes are debounced at 3 seconds and skipped entirely when the tab is backgrounded. Nothing fetches on a timer. The refresh indicator (spinning ring outside the wheel) shows when a fetch is in flight.
 
 If Claude's API rate-limits us (HTTP 429), staminai backs off on a `1 min → 5 min → 15 min` ladder. 5xx responses trigger a 30-second cooldown. A `Retry-After` header overrides both if it asks for longer.
 
@@ -125,9 +129,15 @@ The SVG lives in a fixed `0 0 100 100` coordinate space and is sized entirely by
 
 The tooltip uses Claude's own CSS custom properties — `--bg-200` for background, `--border-200` for borders, `--text-200` and `--text-300` for text. The wheel background uses `--bg-100`. This means staminai matches Claude's dark theme natively and won't break when they update their UI.
 
+### Credits
+
+If the usage endpoint reports a credit balance, the tooltip gains a **Credits** row. The field name is probed across several candidates and the row is omitted entirely when none match — it will never show a misleading zero.
+
 ### Design ring
 
 The outer dotted ring shows Claude Design usage. The API response is checked for `seven_day_design`, `design`, or `seven_day_opus` fields. When available, the ring lights up with the stamina color palette. When unavailable (the API field doesn't exist yet on your plan), the tooltip shows "—" and the ring remains a dim track.
+
+Because a dotted ring can't carry progress in its own dash pattern — a dash offset would only slide the dots around — the coloured ring is masked by a plain arc. The dot period divides the circumference evenly so the pattern closes with no seam, and the mask is snapped to end in a gap so no dot is ever cut in half.
 
 ## Permissions
 
@@ -142,12 +152,12 @@ No background workers. No remote code. No storage. No cookies permission. Same-o
 - No data leaves your browser except to `claude.ai`
 - No analytics, telemetry, or third-party calls
 - The only thing stored is where you dragged the wheel — a single `localStorage` key (`staminai:pos`) holding two numbers. No usage data is ever persisted.
-- ~525 lines JS, ~110 lines CSS — fully auditable
+- ~640 lines JS, ~110 lines CSS — fully auditable
 
 ## FAQ
 
-**What does "%" mean in the wheel center?**
-100% remaining — full stamina, no usage consumed yet.
+**Why does the wheel show a time instead of rings?**
+Your session or weekly limit is fully spent. The `HH:MM` is how long until it resets.
 
 **Can I move the wheel?**
 Yes — hold click and drag it anywhere. Its position is remembered per browser.

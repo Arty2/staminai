@@ -4,6 +4,19 @@ All notable changes to staminai are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] — 2026-09-16
+
+### Added
+- **Credits in the tooltip.** When the usage endpoint reports a credit balance, a **Credits** row appears below Design. The lookup probes several candidate field names and the row is omitted entirely when none match, so it can't show a misleading zero.
+- **Exhausted-state countdown.** When the session or weekly limit is fully spent, the rings give way to an `HH:MM` countdown to the reset — at that point the only number worth showing. It repaints every 30 s (no network, skipped while the tab is backgrounded) and stands itself down the moment the wheel returns to rings.
+
+### Changed
+- **No number inside the inner ring.** Exact percentages live in the tooltip; the rings are the whole reading. This also removes the backing disc that was clipping the session arc's round end cap.
+- **Ring proportions rebalanced** so the session arc tapers to a true round tip whose diameter matches the ring thickness. The cap has radius `S_SESSION / 2`, so the layout now lands the ring radius exactly on `S_SESSION` — any thicker and the cap overran the centre hole and curled the arc over itself. Gaps widened from 3 to 4 so the rings read as three distinct bands.
+
+### Fixed
+- **Design ring progress now actually shows proportion.** The dotted ring was drawing progress as a `stroke-dashoffset` on its own dash pattern, which only slid the dots around — the colour never retracted. It's now a full dotted ring masked by a plain arc, so the colour retracts around the ring exactly like the solid ones. The dot period divides the circumference evenly (no seam at the start point) and the mask is snapped to end in a gap so no dot is sliced in half.
+
 ## [2.2.0] — 2026-09-15
 
 ### Added
