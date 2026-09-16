@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [2.3.0] — 2026-09-16
 
 ### Added
-- **Credits in the tooltip.** When the usage endpoint reports a credit balance, a **Credits** row appears below Design. The lookup probes several candidate field names and the row is omitted entirely when none match, so it can't show a misleading zero.
+- **Dormant Credits row.** A tooltip row for a credit balance is wired up but switched off — the usage endpoint does not surface one, and nothing reads the response for it. Nothing changes on screen; the row exists so it can be enabled the day the field appears.
 - **Exhausted-state countdown.** When the session or weekly limit is fully spent, the rings give way to an `HH:MM` countdown to the reset — at that point the only number worth showing. It repaints every 30 s (no network, skipped while the tab is backgrounded) and stands itself down the moment the wheel returns to rings.
 
 ### Changed

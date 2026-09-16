@@ -24,6 +24,11 @@
   const GAP       = 4;
   const RIM       = 1.5;             // breathing room at the wheel edge
 
+  /* Dormant until the usage endpoint exposes a balance: set CREDITS_FIELD to the
+   * real key, flip CREDITS_ENABLED, and verify against a real response. */
+  const CREDITS_ENABLED = false;
+  const CREDITS_FIELD   = "";
+
   const DESIGN_DOTS = 16;            // dots around the design ring
   const DESIGN_DUTY = 0.42;          // fraction of each dot period that is ink
   const CLOCK_FS    = 32;            // countdown type size, in viewBox units
@@ -79,27 +84,16 @@
     };
   }
 
-  /* ── Extract credit balance from API response ──────── */
+  /* ── Credits (dormant) ──────────────────── */
 
-  /* The usage endpoint has carried this under several names; accept a bare
-   * number or an object, and render nothing at all when none of them match. */
+  /* The usage endpoint does not surface a credit balance. The row is wired up
+   * and switched off rather than guessed at: nothing here reads the response
+   * until CREDITS_FIELD names a key the API actually returns. Probing a list of
+   * plausible names finds nothing and risks latching onto an unrelated field. */
   function getCredits(raw) {
-    if (!raw || typeof raw !== "object") return null;
-    const num = (v) => {
-      if (typeof v === "number" && Number.isFinite(v)) return v;
-      if (v && typeof v === "object") {
-        for (const k of ["available", "remaining", "balance", "amount", "credits"]) {
-          if (typeof v[k] === "number" && Number.isFinite(v[k])) return v[k];
-        }
-      }
-      return null;
-    };
-    for (const k of ["credits_available", "available_credits", "credits_remaining",
-                     "credit_balance", "extra_credits", "credits", "credit"]) {
-      const v = num(raw[k]);
-      if (v !== null) return Math.max(0, v);
-    }
-    return null;
+    if (!CREDITS_ENABLED || !CREDITS_FIELD) return null;
+    const v = raw?.[CREDITS_FIELD];
+    return typeof v === "number" && Number.isFinite(v) ? Math.max(0, v) : null;
   }
 
   /* ── Exhausted state ───────────────────────────────── */
@@ -328,7 +322,7 @@
       dU === null
     ));
 
-    // No ring for credits — they're a balance, not a window.
+    // No ring for credits — they're a balance, not a window. Off by default.
     const credits = getCredits(raw);
     if (credits !== null) {
       tip.appendChild(tipRow(

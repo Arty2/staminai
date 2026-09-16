@@ -129,10 +129,6 @@ The SVG lives in a fixed `0 0 100 100` coordinate space and is sized entirely by
 
 The tooltip uses Claude's own CSS custom properties — `--bg-200` for background, `--border-200` for borders, `--text-200` and `--text-300` for text. The wheel background uses `--bg-100`. This means staminai matches Claude's dark theme natively and won't break when they update their UI.
 
-### Credits
-
-If the usage endpoint reports a credit balance, the tooltip gains a **Credits** row. The field name is probed across several candidates and the row is omitted entirely when none match — it will never show a misleading zero.
-
 ### Design ring
 
 The outer dotted ring shows Claude Design usage. The API response is checked for `seven_day_design`, `design`, or `seven_day_opus` fields. When available, the ring lights up with the stamina color palette. When unavailable (the API field doesn't exist yet on your plan), the tooltip shows "—" and the ring remains a dim track.

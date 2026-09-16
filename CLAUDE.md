@@ -113,11 +113,20 @@ so no dot is ever sliced in half.
 
 ### Tolerating an unknown API shape
 
-`getDesignUtil` and `getCredits` both probe a list of candidate field names and
-return `null` when none match, because the usage endpoint is undocumented and
-has carried these under different keys. Callers render the Design row as `—` and
-omit the Credits row entirely when the lookup comes back empty. Keep new fields
-defensive in the same way — never index straight into a response.
+`getDesignUtil` probes a short list of candidate field names and returns `null`
+when none match, because the usage endpoint is undocumented and has carried the
+Design quota under more than one key. Callers render the Design row as `—` when
+the lookup comes back empty. Keep new fields defensive in the same way — never
+index straight into a response.
+
+**Credits are dormant, and must stay that way.** The endpoint does not surface a
+credit balance. `getCredits` is gated behind `CREDITS_ENABLED` and reads exactly
+one key, `CREDITS_FIELD`, which is empty — so nothing reads the response for it
+at all. Do not restore the speculative multi-key probe: guessing at names the
+API has never returned finds nothing, and risks latching onto an unrelated
+field. When the endpoint does expose credits, set `CREDITS_FIELD` to the real
+key, flip `CREDITS_ENABLED`, and confirm against a real response before
+shipping. The tooltip row below it is already wired and needs no other change.
 
 ## Best practices for browser add-ons
 
