@@ -31,7 +31,8 @@
 
   const DESIGN_DOTS = 16;            // dots around the design ring
   const DESIGN_DUTY = 0.42;          // fraction of each dot period that is ink
-  const CLOCK_FS    = 32;            // countdown type size, in viewBox units
+  const CLOCK_FS    = 26;            // countdown type size, in viewBox units
+  const CLOCK_PAD   = 34;            // clear width kept around the countdown, in viewBox units
   const TICK_MS     = 30_000;        // countdown repaint cadence (no network)
 
   const EDGE_PAD = 8;                // keep this far from the viewport edge
@@ -143,7 +144,7 @@
     const cW = 2 * Math.PI * rWeekly;
     const cS = 2 * Math.PI * rSession;
 
-    const rR = rDesign + S_DESIGN / 2 + 4;
+    const rR = cx - 1.5;               // spinner hugs the rim, inside the wheel
 
     while (svg.firstChild) svg.removeChild(svg.firstChild);
 
@@ -245,7 +246,7 @@
     const label = svgEl("text", {
       x: cx, y: cy + 1,
       "text-anchor": "middle", "dominant-baseline": "central",
-      "font-size": Math.min(CLOCK_FS, (VB - 14) / (0.56 * txt.length)),
+      "font-size": Math.min(CLOCK_FS, (VB - CLOCK_PAD) / (0.56 * txt.length)),
       "font-weight": "600", fill: palette(100).stroke,
       "font-family": "inherit", "letter-spacing": "-0.02em",
       "font-variant-numeric": "tabular-nums"
@@ -258,10 +259,9 @@
     const cR = 2 * Math.PI * rR;
     const g = svgEl("g", { id: "csw-refresh-ring" });
     g.appendChild(svgEl("circle", {
-      cx, cy, r: rR, fill: "none", stroke: REFRESH_CLR, "stroke-width": "5",
+      cx, cy, r: rR, fill: "none", stroke: REFRESH_CLR, "stroke-width": 3,
       "stroke-linecap": "round",
-      "stroke-dasharray": `${cR * 0.15} ${cR * 0.85}`,
-      "transform-origin": `${cx} ${cy}`
+      "stroke-dasharray": `${cR * 0.15} ${cR * 0.85}`
     }));
     return g;
   }

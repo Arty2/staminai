@@ -39,7 +39,13 @@
 #csw-wheel svg { display: block; width: 100%; height: 100%; overflow: visible; }
 #csw-wheel svg circle { transition: stroke .5s ease, stroke-dasharray .7s ease; }
 
-#csw-refresh-ring { opacity: 0; transition: opacity .2s ease; }
+#csw-refresh-ring {
+  opacity: 0;
+  transition: opacity .2s ease;
+  /* Pivot on the wheel's centre; SVG otherwise spins about the viewBox origin. */
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+}
 #csw-refresh-ring.csw-active { opacity: 1; animation: csw-spin .8s linear infinite; }
 @keyframes csw-spin { to { transform: rotate(360deg); } }
 
