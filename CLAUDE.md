@@ -107,21 +107,26 @@ exactly on `S_SESSION` — the thickest the inner ring can be. If you thicken it
 further, widen `GAP` or thin the outer rings to compensate, and re-render the
 `full` / `mixed` / `critical` states before believing it looks right.
 
-The **design ring is dotted, and a dotted ring cannot carry progress in its own
+The **outer ring is dormant.** It used to show Claude Design, which no longer
+has its own allowance (Design now counts toward the shared limits). It is kept
+switched off behind `OUTER_ENABLED` / `OUTER_FIELD`, like credits below, for the
+next separate meter or a credit balance. Its space is still reserved in the
+geometry, so the inner rings don't change size when it's toggled.
+
+The **outer ring is dotted, and a dotted ring cannot carry progress in its own
 dash pattern** — putting a `stroke-dashoffset` on it just slides the dots around
 and shows no proportion at all. It is drawn as a full dotted ring masked by a
 plain arc, so the colour retracts around the ring exactly like the solid ones.
-The dot period is derived as `circumference / DESIGN_DOTS` so the pattern closes
+The dot period is derived as `circumference / OUTER_DOTS` so the pattern closes
 with no seam at the 3 o'clock start, and the mask arc is snapped to end in a gap
 so no dot is ever sliced in half.
 
 ### Tolerating an unknown API shape
 
-`getDesignUtil` probes a short list of candidate field names and returns `null`
-when none match, because the usage endpoint is undocumented and has carried the
-Design quota under more than one key. Callers render the Design row as `—` when
-the lookup comes back empty. Keep new fields defensive in the same way — never
-index straight into a response.
+The usage endpoint is undocumented. Lookups like `getOuterUtil` and `getCredits`
+read one named key, type-check the value, and return `null` otherwise; callers
+render `—` or nothing when it comes back empty. Keep new fields defensive in the
+same way — never index straight into a response.
 
 **Credits are dormant, and must stay that way.** The endpoint does not surface a
 credit balance. `getCredits` is gated behind `CREDITS_ENABLED` and reads exactly

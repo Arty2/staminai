@@ -39,19 +39,30 @@
 #csw-wheel svg { display: block; width: 100%; height: 100%; overflow: visible; }
 #csw-wheel svg circle { transition: stroke .5s ease, stroke-dasharray .7s ease; }
 
-#csw-refresh-ring { opacity: 0; transition: opacity .2s ease; }
+#csw-refresh-ring {
+  opacity: 0;
+  transition: opacity .2s ease;
+  /* Pivot on the wheel's centre; SVG otherwise spins about the viewBox origin. */
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+}
 #csw-refresh-ring.csw-active { opacity: 1; animation: csw-spin .8s linear infinite; }
 @keyframes csw-spin { to { transform: rotate(360deg); } }
 
 /* ── Tooltip ───────────────────────────────────────── */
 
 #csw-tip {
+  /* Fixed tooltip palette, matched to Claude's own dark popovers. */
+  --csw-tip-bg: #20201f;
+  --csw-tip-border: #373736;
+  --csw-tip-text: #f0efeb;
+
   position: absolute;
   top: 50%;
   min-width: 15em;
   padding: 0.85em 1.15em;
-  background: hsl(var(--bg-200, 0 0% 16%));
-  border: 1px solid hsl(var(--border-200, 0 0% 22%));
+  background: var(--csw-tip-bg);
+  border: 1px solid var(--csw-tip-border);
   border-radius: 1em;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
   opacity: 0;
@@ -59,7 +70,7 @@
   transition: opacity 0.2s ease, transform 0.2s ease;
   font-size: var(--csw-font);
   line-height: 1.5;
-  color: hsl(var(--text-200, 0 0% 75%));
+  color: var(--csw-tip-text);
   white-space: nowrap;
 }
 
@@ -83,24 +94,24 @@
 #csw-tip .csw-org {
   font-size: 0.92em;
   font-weight: 600;
-  color: hsl(var(--text-100, 0 0% 90%));
+  color: var(--csw-tip-border);
   letter-spacing: .02em;
   padding-bottom: 0.35em;
   margin-bottom: 0.35em;
-  border-bottom: 1px solid hsl(var(--border-200, 0 0% 22%));
+  border-bottom: 1px solid var(--csw-tip-border);
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 20em;
 }
 #csw-tip .csw-row   { display: flex; align-items: center; gap: 0.7em; padding: 0.25em 0; }
 #csw-tip .csw-dot   { width: 0.65em; height: 0.65em; border-radius: 50%; flex-shrink: 0; }
-#csw-tip .csw-label { flex: 1; color: hsl(var(--text-300, 0 0% 50%)); font-size: 0.92em; letter-spacing: .03em; }
+#csw-tip .csw-label { flex: 1; color: color-mix(in srgb, var(--csw-tip-text) 60%, transparent); font-size: 0.92em; letter-spacing: .03em; }
 #csw-tip .csw-val   { font-variant-numeric: tabular-nums; font-weight: 500; font-size: 1.08em; }
 #csw-tip .csw-reset {
-  color: hsl(var(--text-300, 0 0% 50%));
+  color: color-mix(in srgb, var(--csw-tip-text) 60%, transparent);
   font-size: 0.85em;
   padding-top: 0.4em;
-  border-top: 1px solid hsl(var(--border-200, 0 0% 22%));
+  border-top: 1px solid var(--csw-tip-border);
   margin-top: 0.4em;
 }
 

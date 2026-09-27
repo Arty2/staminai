@@ -20,7 +20,7 @@
    * itself instead of tapering to a round tip. */
   const S_SESSION = 15;              // inner ring
   const S_WEEKLY  = 12;              // middle ring
-  const S_DESIGN  = 6;               // outer ring (Claude Design)
+  const S_OUTER   = 6;               // outer ring (dormant spare meter)
   const GAP       = 4;
   const RIM       = 1.5;             // breathing room at the wheel edge
 
@@ -29,9 +29,17 @@
   const CREDITS_ENABLED = false;
   const CREDITS_FIELD   = "";
 
-  const DESIGN_DOTS = 16;            // dots around the design ring
-  const DESIGN_DUTY = 0.42;          // fraction of each dot period that is ink
-  const CLOCK_FS    = 32;            // countdown type size, in viewBox units
+  /* Dormant spare meter on the outer dotted ring. Claude Design used to live
+   * here, until its allowance folded into the plan's shared limits. Kept wired
+   * for the next separate meter (or a credit balance): set OUTER_FIELD to the
+   * real key, flip OUTER_ENABLED, and verify against a real response. Its
+   * space is still reserved, so the inner rings keep their size either way. */
+  const OUTER_ENABLED = false;
+  const OUTER_FIELD   = "";
+  const OUTER_DOTS  = 16;            // dots around the outer ring
+  const OUTER_DUTY  = 0.42;          // fraction of each dot period that is ink
+  const CLOCK_FS    = 26;            // countdown type size, in viewBox units
+  const CLOCK_PAD   = 34;            // clear width kept around the countdown, in viewBox units
   const TICK_MS     = 30_000;        // countdown repaint cadence (no network)
 
   const EDGE_PAD = 8;                // keep this far from the viewport edge
@@ -70,14 +78,12 @@
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VB} ${VB}"></svg>
     </div>`;
 
-  /* ── Extract design data from API response ─────────── */
+  /* ── Outer meter (dormant) ─────────────────────────── */
 
-  function getDesignUtil(raw) {
-    const d = raw?.seven_day_design
-           || raw?.design
-           || raw?.seven_day_opus
-           || null;
-    if (!d || d.utilization == null) return null;
+  function getOuterUtil(raw) {
+    if (!OUTER_ENABLED || !OUTER_FIELD) return null;
+    const d = raw?.[OUTER_FIELD];
+    if (!d || typeof d.utilization !== "number") return null;
     return {
       utilization: Math.min(d.utilization, 100),
       resets_at: d.resets_at || null
@@ -135,15 +141,15 @@
     const svg = root.querySelector("#csw-wheel svg");
     const cx = VB / 2, cy = VB / 2;
 
-    const rDesign  = cx - S_DESIGN / 2 - RIM;
-    const rWeekly  = rDesign - S_DESIGN / 2 - GAP - S_WEEKLY / 2;
+    const rOuter  = cx - S_OUTER / 2 - RIM;
+    const rWeekly  = rOuter - S_OUTER / 2 - GAP - S_WEEKLY / 2;
     const rSession = rWeekly - S_WEEKLY / 2 - GAP - S_SESSION / 2;
 
-    const cD = 2 * Math.PI * rDesign;
+    const cD = 2 * Math.PI * rOuter;
     const cW = 2 * Math.PI * rWeekly;
     const cS = 2 * Math.PI * rSession;
 
-    const rR = rDesign + S_DESIGN / 2 + 4;
+    const rR = cx - 1.5;               // spinner hugs the rim, inside the wheel
 
     while (svg.firstChild) svg.removeChild(svg.firstChild);
 
@@ -151,8 +157,8 @@
     setTick(blockedEnd !== null);
 
     if (blockedEnd !== null) {
-      svg.appendChild(svgEl("circle", {
-        cx, cy, r: rDesign, fill: "none", stroke: TRACK, "stroke-width": S_DESIGN
+      if (OUTER_ENABLED) svg.appendChild(svgEl("circle", {
+        cx, cy, r: rOuter, fill: "none", stroke: TRACK, "stroke-width": S_OUTER
       }));
       renderClock(svg, cx, cy, blockedEnd);
       svg.appendChild(refreshRing(cx, cy, rR));
@@ -165,15 +171,15 @@
     const wR = Math.max(0, 100 - wU);
     const sC = palette(sU), wC = palette(wU);
 
-    const design = getDesignUtil(raw);
-    const dU = design?.utilization ?? 0;
+    const outer = getOuterUtil(raw);
+    const dU = outer?.utilization ?? 0;
     const dR = Math.max(0, 100 - dU);
-    const dC = design ? palette(dU) : { stroke: "rgba(255,255,255,0.06)" };
+    const dC = outer ? palette(dU) : { stroke: "rgba(255,255,255,0.06)" };
 
     /* Dot period divides the circumference exactly, so the pattern closes
      * around the ring with no seam at the 3 o'clock start point. */
-    const period = cD / DESIGN_DOTS;
-    const ink = period * DESIGN_DUTY;
+    const period = cD / OUTER_DOTS;
+    const ink = period * OUTER_DUTY;
     const dots = `${ink} ${period - ink}`;
 
     svg.appendChild(svgEl("circle", {
@@ -182,40 +188,40 @@
     svg.appendChild(svgEl("circle", {
       cx, cy, r: rSession, fill: "none", stroke: TRACK, "stroke-width": S_SESSION
     }));
-    svg.appendChild(svgEl("circle", {
-      cx, cy, r: rDesign, fill: "none", stroke: TRACK, "stroke-width": S_DESIGN,
+    if (OUTER_ENABLED) svg.appendChild(svgEl("circle", {
+      cx, cy, r: rOuter, fill: "none", stroke: TRACK, "stroke-width": S_OUTER,
       "stroke-dasharray": dots, "stroke-linecap": "round"
     }));
 
-    if (design && dR > 0.5) {
+    if (outer && dR > 0.5) {
       /* The dotted ring can't carry progress in its own dash pattern — that
        * would just shift the dots. Draw the full dotted ring and mask it with
        * a plain arc, so colour retracts around the ring like the others do. */
       const whole = dR >= 99.5;
       const colored = svgEl("circle", {
-        cx, cy, r: rDesign, fill: "none", stroke: dC.stroke, "stroke-width": S_DESIGN,
+        cx, cy, r: rOuter, fill: "none", stroke: dC.stroke, "stroke-width": S_OUTER,
         "stroke-linecap": "round", "stroke-dasharray": dots, opacity: "0.85"
       });
 
       if (!whole) {
         // Snap the cut to a gap between dots so none is sliced in half.
-        const n = clamp(Math.round((dR / 100) * cD / period), 1, DESIGN_DOTS - 1);
+        const n = clamp(Math.round((dR / 100) * cD / period), 1, OUTER_DOTS - 1);
         const arc = n * period - (period - ink) / 2;
 
         const mask = svgEl("mask", {
-          id: "csw-design-mask", maskUnits: "userSpaceOnUse",
+          id: "csw-outer-mask", maskUnits: "userSpaceOnUse",
           x: -VB, y: -VB, width: VB * 3, height: VB * 3
         });
         mask.appendChild(svgEl("circle", {
-          cx, cy, r: rDesign, fill: "none", stroke: "#fff",
-          "stroke-width": S_DESIGN + 2,
+          cx, cy, r: rOuter, fill: "none", stroke: "#fff",
+          "stroke-width": S_OUTER + 2,
           "stroke-dasharray": `${arc} ${cD}`,
           transform: `rotate(-90 ${cx} ${cy})`
         }));
         const defs = svgEl("defs", {});
         defs.appendChild(mask);
         svg.appendChild(defs);
-        colored.setAttribute("mask", "url(#csw-design-mask)");
+        colored.setAttribute("mask", "url(#csw-outer-mask)");
       }
       svg.appendChild(colored);
     }
@@ -245,7 +251,7 @@
     const label = svgEl("text", {
       x: cx, y: cy + 1,
       "text-anchor": "middle", "dominant-baseline": "central",
-      "font-size": Math.min(CLOCK_FS, (VB - 14) / (0.56 * txt.length)),
+      "font-size": Math.min(CLOCK_FS, (VB - CLOCK_PAD) / (0.56 * txt.length)),
       "font-weight": "600", fill: palette(100).stroke,
       "font-family": "inherit", "letter-spacing": "-0.02em",
       "font-variant-numeric": "tabular-nums"
@@ -258,10 +264,9 @@
     const cR = 2 * Math.PI * rR;
     const g = svgEl("g", { id: "csw-refresh-ring" });
     g.appendChild(svgEl("circle", {
-      cx, cy, r: rR, fill: "none", stroke: REFRESH_CLR, "stroke-width": "5",
+      cx, cy, r: rR, fill: "none", stroke: REFRESH_CLR, "stroke-width": 3,
       "stroke-linecap": "round",
-      "stroke-dasharray": `${cR * 0.15} ${cR * 0.85}`,
-      "transform-origin": `${cx} ${cy}`
+      "stroke-dasharray": `${cR * 0.15} ${cR * 0.85}`
     }));
     return g;
   }
@@ -300,8 +305,8 @@
     const wU = Math.min(seven?.utilization ?? 0, 100);
     const sC = palette(sU), wC = palette(wU);
 
-    const design = getDesignUtil(raw);
-    const dU = design?.utilization ?? null;
+    const outer = getOuterUtil(raw);
+    const dU = outer?.utilization ?? null;
     const dC = dU !== null ? palette(dU) : { stroke: "#737373" };
 
     while (tip.firstChild) tip.removeChild(tip.firstChild);
@@ -309,14 +314,14 @@
     if (orgName) {
       const orgDiv = document.createElement("div");
       orgDiv.className = "csw-org";
-      orgDiv.textContent = orgName;
+      orgDiv.textContent = orgName.replace(/['’]s organi[sz]ation$/i, "");
       tip.appendChild(orgDiv);
     }
 
     tip.appendChild(tipRow(sC.stroke, "Session", `${Math.round(100 - sU)}%`, sC.stroke));
     tip.appendChild(tipRow(wC.stroke, "Weekly", `${Math.round(100 - wU)}%`, wC.stroke));
-    tip.appendChild(tipRow(
-      dC.stroke, "Design",
+    if (OUTER_ENABLED) tip.appendChild(tipRow(
+      dC.stroke, "Other",
       dU !== null ? `${Math.round(100 - dU)}%` : "—",
       dC.stroke,
       dU === null
@@ -328,7 +333,7 @@
       tip.appendChild(tipRow(
         "#737373", "Credits",
         credits.toLocaleString(undefined, { maximumFractionDigits: 2 }),
-        "hsl(var(--text-100, 0 0% 90%))"
+        "var(--csw-tip-text)"
       ));
     }
 
@@ -337,9 +342,9 @@
     reset.appendChild(document.createTextNode(`Session resets in ${fmtIn(five?.resets_at)}`));
     reset.appendChild(document.createElement("br"));
     reset.appendChild(document.createTextNode(`Weekly resets ${fmtAt(seven?.resets_at)}`));
-    if (design?.resets_at) {
+    if (outer?.resets_at) {
       reset.appendChild(document.createElement("br"));
-      reset.appendChild(document.createTextNode(`Design resets ${fmtAt(design.resets_at)}`));
+      reset.appendChild(document.createTextNode(`Other resets ${fmtAt(outer.resets_at)}`));
     }
     tip.appendChild(reset);
   }

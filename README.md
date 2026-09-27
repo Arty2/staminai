@@ -2,7 +2,7 @@
 
 The AI token stamina wheel for [Claude](https://claude.ai).
 
-A browser extension that floats a compact, draggable stamina wheel over Claude, showing your session, weekly, and Claude Design usage limits at a glance.
+A browser extension that floats a compact, draggable stamina wheel over Claude, showing your session and weekly usage limits at a glance.
 
 - [Website](https://heracl.es/staminai)
 - [Source](https://git.heracl.es/staminai)
@@ -24,11 +24,10 @@ From outside in, the rings visualize:
 
 | Ring | Style | Data |
 |---|---|---|
-| **Design** | Dotted, 1px | Claude Design weekly limit |
 | **Weekly** | Solid, medium | 7-day rolling cap |
 | **Session** | Solid, thick | 5-hour session window |
 
-Each arc tapers to a round tip whose diameter matches its ring thickness. The dotted Design ring retracts around the circle like the solid ones — it is drawn as a full dotted ring masked by an arc, rather than shifting its own dash pattern.
+Each arc tapers to a round tip whose diameter matches its ring thickness.
 
 ## When does it refresh?
 
@@ -127,13 +126,11 @@ The SVG lives in a fixed `0 0 100 100` coordinate space and is sized entirely by
 
 ### Theming
 
-The tooltip uses Claude's own CSS custom properties — `--bg-200` for background, `--border-200` for borders, `--text-200` and `--text-300` for text. The wheel background uses `--bg-100`. This means staminai matches Claude's dark theme natively and won't break when they update their UI.
+The wheel background uses Claude's own `--bg-100` custom property, so it follows Claude's theme. The tooltip uses a fixed palette matched to Claude's dark popovers (`--csw-tip-bg`, `--csw-tip-border`, `--csw-tip-text` on `#csw-tip`).
 
-### Design ring
+### Claude Design
 
-The outer dotted ring shows Claude Design usage. The API response is checked for `seven_day_design`, `design`, or `seven_day_opus` fields. When available, the ring lights up with the stamina color palette. When unavailable (the API field doesn't exist yet on your plan), the tooltip shows "—" and the ring remains a dim track.
-
-Because a dotted ring can't carry progress in its own dash pattern — a dash offset would only slide the dots around — the coloured ring is masked by a plain arc. The dot period divides the circumference evenly so the pattern closes with no seam, and the mask is snapped to end in a gap so no dot is ever cut in half.
+Claude Design used to have its own weekly allowance, shown on a dotted outer ring. All Claude Design activity now counts toward your plan's shared limits, so the ring and its tooltip row are gone. The dotted ring is kept in the code, switched off, for a future separate meter or a credit balance.
 
 ## Permissions
 
@@ -158,8 +155,8 @@ Your session or weekly limit is fully spent. The `HH:MM` is how long until it re
 **Can I move the wheel?**
 Yes — hold click and drag it anywhere. Its position is remembered per browser.
 
-**Why does the Design row show "—"?**
-Claude hasn't exposed a separate Design quota in the usage API for your plan yet. The ring and tooltip will populate automatically when it appears.
+**Where did the Design ring go?**
+Claude Design no longer has its own allowance — its usage counts toward your plan's shared session and weekly limits, which the two rings already show.
 
 **Does it work with all plans?**
 Yes — Pro, Max, Team, Enterprise. The usage endpoint returns data for whatever plan your session is on.
