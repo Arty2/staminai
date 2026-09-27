@@ -1,83 +1,107 @@
-/* ── staminai · content.css ── v2.1 ─────────────────
+/* ── staminai · content.css ── v2.3 ─────────────────
  *  The AI token stamina wheel for Claude
  *  Dialectic Acheropoieton of Heracles Papatheodorou and Claude
  *  MIT License · https://heracl.es/staminai
  * ──────────────────────────────────────────────────── */
 
 #csw-root {
+  /* Single source of truth for scale. Everything below derives from these. */
+  --csw-size: clamp(28px, 2vw, 56px);
+  --csw-font: clamp(10px, calc(var(--csw-size) * 0.3), 14px);
+
   position: fixed;
   z-index: 2147483646;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   user-select: none;
   -webkit-user-select: none;
   pointer-events: auto;
-  bottom: 60px;
-  left: 16px;
-  transition: left 0.25s ease, bottom 0.25s ease;
+
+  /* Fallback only — JS places the wheel in px before first paint. */
+  top: 50%;
+  right: 1rem;
 }
 
 #csw-wheel {
-  cursor: pointer;
+  cursor: grab;
   position: relative;
+  width: var(--csw-size);
+  height: var(--csw-size);
   border-radius: 50%;
   background: hsl(var(--bg-100, 0 0% 8%));
-  transition: width 0.25s ease, height 0.25s ease;
+  touch-action: none;
+  transition: box-shadow 0.2s ease, filter 0.2s ease;
 }
-#csw-wheel svg { display:block; width:100%; height:100%; overflow:visible; }
+#csw-wheel:hover { filter: brightness(1.08); }
+#csw-root.csw-dragging #csw-wheel {
+  cursor: grabbing;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+}
+#csw-wheel svg { display: block; width: 100%; height: 100%; overflow: visible; }
 #csw-wheel svg circle { transition: stroke .5s ease, stroke-dasharray .7s ease; }
 
-#csw-refresh-ring { opacity:0; transition:opacity .2s ease; }
-#csw-refresh-ring.csw-active { opacity:1; animation:csw-spin .8s linear infinite; }
-@keyframes csw-spin { to { transform:rotate(360deg); } }
+#csw-refresh-ring { opacity: 0; transition: opacity .2s ease; }
+#csw-refresh-ring.csw-active { opacity: 1; animation: csw-spin .8s linear infinite; }
+@keyframes csw-spin { to { transform: rotate(360deg); } }
 
 /* ── Tooltip ───────────────────────────────────────── */
 
 #csw-tip {
   position: absolute;
-  left: calc(100% + 10px);
   top: 50%;
-  transform: translateY(-50%) translateX(4px) scale(0.96);
-  min-width: 190px;
-  padding: 10px 14px;
+  min-width: 15em;
+  padding: 0.85em 1.15em;
   background: hsl(var(--bg-200, 0 0% 16%));
   border: 1px solid hsl(var(--border-200, 0 0% 22%));
-  border-radius: 12px;
+  border-radius: 1em;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s ease, transform 0.2s ease;
-  font-size: 12px;
+  font-size: var(--csw-font);
   line-height: 1.5;
   color: hsl(var(--text-200, 0 0% 75%));
   white-space: nowrap;
 }
-#csw-tip.csw-show {
+
+/* Tooltip flips to whichever side of the viewport has room. */
+#csw-root.csw-tip-right #csw-tip {
+  left: calc(100% + 0.8em);
+  transform: translateY(calc(-50% + var(--csw-tip-shift, 0px))) translateX(4px) scale(0.96);
+}
+#csw-root.csw-tip-left #csw-tip {
+  right: calc(100% + 0.8em);
+  transform: translateY(calc(-50% + var(--csw-tip-shift, 0px))) translateX(-4px) scale(0.96);
+}
+#csw-root.csw-tip-right #csw-tip.csw-show,
+#csw-root.csw-tip-left #csw-tip.csw-show {
   opacity: 1;
-  transform: translateY(-50%) translateX(0) scale(1);
+  transform: translateY(calc(-50% + var(--csw-tip-shift, 0px))) scale(1);
   pointer-events: auto;
 }
-#csw-tip .csw-org   {
-  font-size: 11px;
+#csw-root.csw-dragging #csw-tip { display: none; }
+
+#csw-tip .csw-org {
+  font-size: 0.92em;
   font-weight: 600;
   color: hsl(var(--text-100, 0 0% 90%));
   letter-spacing: .02em;
-  padding-bottom: 4px;
-  margin-bottom: 4px;
+  padding-bottom: 0.35em;
+  margin-bottom: 0.35em;
   border-bottom: 1px solid hsl(var(--border-200, 0 0% 22%));
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 240px;
+  max-width: 20em;
 }
-#csw-tip .csw-row   { display:flex; align-items:center; gap:8px; padding:3px 0; }
-#csw-tip .csw-dot   { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
-#csw-tip .csw-label  { flex:1; color:hsl(var(--text-300, 0 0% 50%)); font-size:11px; letter-spacing:.03em; }
-#csw-tip .csw-val    { font-variant-numeric:tabular-nums; font-weight:500; font-size:13px; }
-#csw-tip .csw-reset  {
+#csw-tip .csw-row   { display: flex; align-items: center; gap: 0.7em; padding: 0.25em 0; }
+#csw-tip .csw-dot   { width: 0.65em; height: 0.65em; border-radius: 50%; flex-shrink: 0; }
+#csw-tip .csw-label { flex: 1; color: hsl(var(--text-300, 0 0% 50%)); font-size: 0.92em; letter-spacing: .03em; }
+#csw-tip .csw-val   { font-variant-numeric: tabular-nums; font-weight: 500; font-size: 1.08em; }
+#csw-tip .csw-reset {
   color: hsl(var(--text-300, 0 0% 50%));
-  font-size: 10px;
-  padding-top: 4px;
+  font-size: 0.85em;
+  padding-top: 0.4em;
   border-top: 1px solid hsl(var(--border-200, 0 0% 22%));
-  margin-top: 4px;
+  margin-top: 0.4em;
 }
 
 /* ── States ────────────────────────────────────────── */

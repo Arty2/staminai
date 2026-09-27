@@ -1,4 +1,4 @@
-/* ── staminai · content.js ─── v2.1 ─────────────────
+/* ── staminai · content.js ─── v2.3 ─────────────────
  *  The AI token stamina wheel for Claude
  *  Dialectic Acheropoieton of Heracles Papatheodorou and Claude
  *  MIT License · https://heracl.es/staminai
@@ -8,12 +8,35 @@
   "use strict";
 
   const FADE_MS = 4000, DEBOUNCE_MS = 3000;
-  const FALLBACK_SIZE = 24, AVATAR_GAP = 8, SIZE_SCALE = 0.72, MIN_SIZE = 20;
 
-  const S_SESSION = 3.5;             // inner ring
-  const S_WEEKLY  = S_SESSION * 0.5; // middle ring
-  const S_DESIGN  = 1;               // outer ring (Claude Design)
-  const GAP       = 1.5;
+  /* The SVG lives in a fixed 100×100 coordinate space and is scaled by CSS
+   * (--csw-size). Every stroke width, radius and font size below is therefore
+   * a percentage of the wheel, so the whole widget scales with the viewport. */
+  const VB = 100;
+
+  /* Ring geometry. The layout below lands rSession exactly on S_SESSION, which
+   * is the constraint that matters: the round end cap has radius S_SESSION / 2,
+   * so any thicker and the cap overruns the centre hole and the arc curls over
+   * itself instead of tapering to a round tip. */
+  const S_SESSION = 15;              // inner ring
+  const S_WEEKLY  = 12;              // middle ring
+  const S_DESIGN  = 6;               // outer ring (Claude Design)
+  const GAP       = 4;
+  const RIM       = 1.5;             // breathing room at the wheel edge
+
+  /* Dormant until the usage endpoint exposes a balance: set CREDITS_FIELD to the
+   * real key, flip CREDITS_ENABLED, and verify against a real response. */
+  const CREDITS_ENABLED = false;
+  const CREDITS_FIELD   = "";
+
+  const DESIGN_DOTS = 16;            // dots around the design ring
+  const DESIGN_DUTY = 0.42;          // fraction of each dot period that is ink
+  const CLOCK_FS    = 32;            // countdown type size, in viewBox units
+  const TICK_MS     = 30_000;        // countdown repaint cadence (no network)
+
+  const EDGE_PAD = 8;                // keep this far from the viewport edge
+  const DRAG_SLOP = 4;               // px of movement before a click becomes a drag
+  const POS_KEY = "staminai:pos";
 
   const TRACK       = "rgba(255,255,255,0.07)";
   const REFRESH_CLR = "rgba(255,255,255,0.22)";
@@ -31,21 +54,21 @@
   };
 
   let orgId = null, orgName = null, data = null, expanded = false;
-  let fadeTimer = null, lastRefresh = 0, curSize = FALLBACK_SIZE;
+  let fadeTimer = null, lastRefresh = 0;
   let cooldownUntil = 0, retry429Step = 0;
+  let frac = { fx: 1, fy: 0.5 };     // normalized position, default: middle right
+  let suppressClick = false;
+  let blockedEnd = null, tickTimer = null;
+
+  const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
 
   const root = document.createElement("div");
   root.id = "csw-root";
   root.innerHTML = `
     <div id="csw-tip"></div>
     <div id="csw-wheel">
-      <svg xmlns="http://www.w3.org/2000/svg"></svg>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VB} ${VB}"></svg>
     </div>`;
-
-  function displayValue(remaining) {
-    const v = Math.round(remaining);
-    return v === 100 ? "%" : String(v);
-  }
 
   /* ── Extract design data from API response ─────────── */
 
@@ -61,19 +84,58 @@
     };
   }
 
+  /* ── Credits (dormant) ──────────────────── */
+
+  /* The usage endpoint does not surface a credit balance. The row is wired up
+   * and switched off rather than guessed at: nothing here reads the response
+   * until CREDITS_FIELD names a key the API actually returns. Probing a list of
+   * plausible names finds nothing and risks latching onto an unrelated field. */
+  function getCredits(raw) {
+    if (!CREDITS_ENABLED || !CREDITS_FIELD) return null;
+    const v = raw?.[CREDITS_FIELD];
+    return typeof v === "number" && Number.isFinite(v) ? Math.max(0, v) : null;
+  }
+
+  /* ── Exhausted state ───────────────────────────────── */
+
+  /* When a limit that actually gates chatting is spent, the rings have nothing
+   * left to say — the only useful number is how long until it comes back. */
+  function blockedUntil(five, seven) {
+    const ends = [];
+    for (const lim of [five, seven]) {
+      if (!lim || !lim.resets_at) continue;
+      if (Math.min(lim.utilization ?? 0, 100) < 100) continue;
+      const t = new Date(lim.resets_at).getTime();
+      if (!Number.isNaN(t) && t > Date.now()) ends.push(t);
+    }
+    return ends.length ? Math.min(...ends) : null;
+  }
+
+  function fmtClock(ms) {
+    const mins = Math.max(0, Math.ceil(ms / 60000));
+    return `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
+  }
+
+  /* Repaints the countdown only while a limit is spent. No network, and it
+   * stands down the moment the wheel goes back to rings. */
+  function setTick(on) {
+    if (on && !tickTimer) tickTimer = setInterval(onTick, TICK_MS);
+    else if (!on && tickTimer) { clearInterval(tickTimer); tickTimer = null; }
+  }
+
+  function onTick() {
+    if (document.visibilityState !== "visible") return;
+    if (blockedEnd !== null && Date.now() >= blockedEnd) { triggerRefresh(); return; }
+    renderWheel(data?.five_hour, data?.seven_day, data);
+  }
+
   /* ── SVG ───────────────────────────────────────────── */
 
   function renderWheel(five, seven, raw) {
-    const size = curSize;
     const svg = root.querySelector("#csw-wheel svg");
-    const wheel = root.querySelector("#csw-wheel");
-    wheel.style.width = size + "px";
-    wheel.style.height = size + "px";
-    svg.setAttribute("viewBox", `0 0 ${size} ${size}`);
+    const cx = VB / 2, cy = VB / 2;
 
-    const cx = size / 2, cy = size / 2;
-
-    const rDesign  = cx - S_DESIGN / 2 - 0.5;
+    const rDesign  = cx - S_DESIGN / 2 - RIM;
     const rWeekly  = rDesign - S_DESIGN / 2 - GAP - S_WEEKLY / 2;
     const rSession = rWeekly - S_WEEKLY / 2 - GAP - S_SESSION / 2;
 
@@ -81,8 +143,21 @@
     const cW = 2 * Math.PI * rWeekly;
     const cS = 2 * Math.PI * rSession;
 
-    const rR = rDesign + S_DESIGN / 2 + 1.5;
-    const cR = 2 * Math.PI * rR;
+    const rR = rDesign + S_DESIGN / 2 + 4;
+
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+    blockedEnd = blockedUntil(five, seven);
+    setTick(blockedEnd !== null);
+
+    if (blockedEnd !== null) {
+      svg.appendChild(svgEl("circle", {
+        cx, cy, r: rDesign, fill: "none", stroke: TRACK, "stroke-width": S_DESIGN
+      }));
+      renderClock(svg, cx, cy, blockedEnd);
+      svg.appendChild(refreshRing(cx, cy, rR));
+      return;
+    }
 
     const sU = Math.min(five?.utilization  ?? 0, 100);
     const wU = Math.min(seven?.utilization ?? 0, 100);
@@ -94,9 +169,12 @@
     const dU = design?.utilization ?? 0;
     const dR = Math.max(0, 100 - dU);
     const dC = design ? palette(dU) : { stroke: "rgba(255,255,255,0.06)" };
-    const hasDesign = design !== null;
 
-    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    /* Dot period divides the circumference exactly, so the pattern closes
+     * around the ring with no seam at the 3 o'clock start point. */
+    const period = cD / DESIGN_DOTS;
+    const ink = period * DESIGN_DUTY;
+    const dots = `${ink} ${period - ink}`;
 
     svg.appendChild(svgEl("circle", {
       cx, cy, r: rWeekly, fill: "none", stroke: TRACK, "stroke-width": S_WEEKLY
@@ -106,18 +184,40 @@
     }));
     svg.appendChild(svgEl("circle", {
       cx, cy, r: rDesign, fill: "none", stroke: TRACK, "stroke-width": S_DESIGN,
-      "stroke-dasharray": "1.5 3", "stroke-linecap": "round"
+      "stroke-dasharray": dots, "stroke-linecap": "round"
     }));
 
-    if (hasDesign && dR > 0.5) {
-      svg.appendChild(svgEl("circle", {
+    if (design && dR > 0.5) {
+      /* The dotted ring can't carry progress in its own dash pattern — that
+       * would just shift the dots. Draw the full dotted ring and mask it with
+       * a plain arc, so colour retracts around the ring like the others do. */
+      const whole = dR >= 99.5;
+      const colored = svgEl("circle", {
         cx, cy, r: rDesign, fill: "none", stroke: dC.stroke, "stroke-width": S_DESIGN,
-        "stroke-linecap": "round", "stroke-dasharray": "1.5 3",
-        "stroke-dashoffset": -((1 - dR / 100) * cD),
-        pathLength: cD,
-        transform: `rotate(-90 ${cx} ${cy})`,
-        opacity: "0.8"
-      }));
+        "stroke-linecap": "round", "stroke-dasharray": dots, opacity: "0.85"
+      });
+
+      if (!whole) {
+        // Snap the cut to a gap between dots so none is sliced in half.
+        const n = clamp(Math.round((dR / 100) * cD / period), 1, DESIGN_DOTS - 1);
+        const arc = n * period - (period - ink) / 2;
+
+        const mask = svgEl("mask", {
+          id: "csw-design-mask", maskUnits: "userSpaceOnUse",
+          x: -VB, y: -VB, width: VB * 3, height: VB * 3
+        });
+        mask.appendChild(svgEl("circle", {
+          cx, cy, r: rDesign, fill: "none", stroke: "#fff",
+          "stroke-width": S_DESIGN + 2,
+          "stroke-dasharray": `${arc} ${cD}`,
+          transform: `rotate(-90 ${cx} ${cy})`
+        }));
+        const defs = svgEl("defs", {});
+        defs.appendChild(mask);
+        svg.appendChild(defs);
+        colored.setAttribute("mask", "url(#csw-design-mask)");
+      }
+      svg.appendChild(colored);
     }
 
     svg.appendChild(svgEl("circle", {
@@ -134,30 +234,64 @@
       transform: `rotate(-90 ${cx} ${cy})`
     }));
 
-    const refreshG = svgEl("g", { id: "csw-refresh-ring" });
-    refreshG.appendChild(svgEl("circle", {
-      cx, cy, r: rR, fill: "none", stroke: REFRESH_CLR, "stroke-width": "1.5",
+    svg.appendChild(refreshRing(cx, cy, rR));
+  }
+
+  /* Hours:minutes until the spent limit comes back, filling the wheel in
+   * place of the rings. Type is sized to the string so a multi-day weekly
+   * reset ("168:00") fits the same circle as a session one. */
+  function renderClock(svg, cx, cy, until) {
+    const txt = fmtClock(until - Date.now());
+    const label = svgEl("text", {
+      x: cx, y: cy + 1,
+      "text-anchor": "middle", "dominant-baseline": "central",
+      "font-size": Math.min(CLOCK_FS, (VB - 14) / (0.56 * txt.length)),
+      "font-weight": "600", fill: palette(100).stroke,
+      "font-family": "inherit", "letter-spacing": "-0.02em",
+      "font-variant-numeric": "tabular-nums"
+    });
+    label.textContent = txt;
+    svg.appendChild(label);
+  }
+
+  function refreshRing(cx, cy, rR) {
+    const cR = 2 * Math.PI * rR;
+    const g = svgEl("g", { id: "csw-refresh-ring" });
+    g.appendChild(svgEl("circle", {
+      cx, cy, r: rR, fill: "none", stroke: REFRESH_CLR, "stroke-width": "5",
       "stroke-linecap": "round",
       "stroke-dasharray": `${cR * 0.15} ${cR * 0.85}`,
       "transform-origin": `${cx} ${cy}`
     }));
-    svg.appendChild(refreshG);
-
-    const label = svgEl("text", {
-      x: cx, y: cy + 0.5,
-      "text-anchor": "middle", "dominant-baseline": "central",
-      "font-size": "10", "font-weight": "600", fill: sC.stroke,
-      "font-family": "inherit", "letter-spacing": "-0.01em",
-      opacity: "0.85"
-    });
-    label.textContent = displayValue(sR);
-    svg.appendChild(label);
+    return g;
   }
 
   function svgEl(tag, attrs) {
     const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
     for (const k in attrs) el.setAttribute(k, attrs[k]);
     return el;
+  }
+
+  /* ── Reset formatting ──────────────────────────────── */
+
+  // Short windows read best as a countdown.
+  function fmtIn(iso) {
+    if (!iso) return "—";
+    const d = new Date(iso) - Date.now();
+    if (Number.isNaN(d)) return "—";
+    if (d <= 0) return "now";
+    const m = Math.floor(d / 60000), h = Math.floor(m / 60);
+    return h > 0 ? `${h}h ${m % 60}m` : `${m}m`;
+  }
+
+  // Multi-day windows read best as an absolute weekday + clock time.
+  function fmtAt(iso) {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "—";
+    return d.toLocaleString(undefined, {
+      weekday: "short", hour: "numeric", minute: "2-digit"
+    });
   }
 
   function renderTip(five, seven, raw) {
@@ -169,14 +303,6 @@
     const design = getDesignUtil(raw);
     const dU = design?.utilization ?? null;
     const dC = dU !== null ? palette(dU) : { stroke: "#737373" };
-
-    const fmt = (iso) => {
-      if (!iso) return "\u2014";
-      const d = new Date(iso) - Date.now();
-      if (d <= 0) return "now";
-      const m = Math.floor(d / 60000), h = Math.floor(m / 60);
-      return h > 0 ? `${h}h ${m % 60}m` : `${m}m`;
-    };
 
     while (tip.firstChild) tip.removeChild(tip.firstChild);
 
@@ -191,19 +317,29 @@
     tip.appendChild(tipRow(wC.stroke, "Weekly", `${Math.round(100 - wU)}%`, wC.stroke));
     tip.appendChild(tipRow(
       dC.stroke, "Design",
-      dU !== null ? `${Math.round(100 - dU)}%` : "\u2014",
+      dU !== null ? `${Math.round(100 - dU)}%` : "—",
       dC.stroke,
       dU === null
     ));
 
+    // No ring for credits — they're a balance, not a window. Off by default.
+    const credits = getCredits(raw);
+    if (credits !== null) {
+      tip.appendChild(tipRow(
+        "#737373", "Credits",
+        credits.toLocaleString(undefined, { maximumFractionDigits: 2 }),
+        "hsl(var(--text-100, 0 0% 90%))"
+      ));
+    }
+
     const reset = document.createElement("div");
     reset.className = "csw-reset";
-    reset.appendChild(document.createTextNode(`Session resets in ${fmt(five?.resets_at)}`));
+    reset.appendChild(document.createTextNode(`Session resets in ${fmtIn(five?.resets_at)}`));
     reset.appendChild(document.createElement("br"));
-    reset.appendChild(document.createTextNode(`Weekly resets in ${fmt(seven?.resets_at)}`));
+    reset.appendChild(document.createTextNode(`Weekly resets ${fmtAt(seven?.resets_at)}`));
     if (design?.resets_at) {
       reset.appendChild(document.createElement("br"));
-      reset.appendChild(document.createTextNode(`Design resets in ${fmt(design.resets_at)}`));
+      reset.appendChild(document.createTextNode(`Design resets ${fmtAt(design.resets_at)}`));
     }
     tip.appendChild(reset);
   }
@@ -231,25 +367,106 @@
     if (r) r.classList.toggle("csw-active", on);
   }
 
-  /* ── Avatar ────────────────────────────────────────── */
+  /* ── Placement ─────────────────────────────────────── */
+  /* The wheel floats free — it is not anchored to any page element, so a
+   * Claude UI reshuffle can never strand it. Position is kept as a fraction
+   * of the free space so it survives window resizes and restores sensibly
+   * on a differently sized screen. */
 
-  function findAvatar() {
-    return document.querySelector('button[data-testid*="user-menu-button"]');
+  function savePos() {
+    try { localStorage.setItem(POS_KEY, JSON.stringify(frac)); } catch (e) { /* private mode */ }
   }
 
-  function anchorToAvatar() {
-    const av = findAvatar(); if (!av) return;
-    const r = av.getBoundingClientRect();
-    const avatarSize = Math.round(Math.max(r.width, r.height));
-    if (avatarSize <= 0) return;
-    const scaled = Math.round(avatarSize * SIZE_SCALE);
-    const size = Math.min(avatarSize, Math.max(MIN_SIZE, scaled));
-    if (size > 0 && size !== curSize) {
-      curSize = size;
-      renderWheel(data?.five_hour, data?.seven_day, data);
+  function loadPos() {
+    try {
+      const p = JSON.parse(localStorage.getItem(POS_KEY) || "null");
+      if (p && Number.isFinite(p.fx) && Number.isFinite(p.fy)) {
+        return { fx: clamp(p.fx, 0, 1), fy: clamp(p.fy, 0, 1) };
+      }
+    } catch (e) { /* private mode or corrupt value */ }
+    return null;
+  }
+
+  function place(x, y, persist) {
+    const b = root.getBoundingClientRect();
+    const spanX = Math.max(1, window.innerWidth  - b.width);
+    const spanY = Math.max(1, window.innerHeight - b.height);
+    x = clamp(x, EDGE_PAD, Math.max(EDGE_PAD, spanX - EDGE_PAD));
+    y = clamp(y, EDGE_PAD, Math.max(EDGE_PAD, spanY - EDGE_PAD));
+
+    root.style.left = Math.round(x) + "px";
+    root.style.top = Math.round(y) + "px";
+    root.style.right = "auto";
+    root.style.bottom = "auto";
+
+    frac = { fx: x / spanX, fy: y / spanY };
+    updateTipSide();
+    if (persist) savePos();
+  }
+
+  function placeFrac(f) {
+    const b = root.getBoundingClientRect();
+    place(f.fx * Math.max(1, window.innerWidth  - b.width),
+          f.fy * Math.max(1, window.innerHeight - b.height), false);
+  }
+
+  function updateTipSide() {
+    const b = root.getBoundingClientRect();
+    const onRightHalf = b.left + b.width / 2 > window.innerWidth / 2;
+    root.classList.toggle("csw-tip-left", onRightHalf);
+    root.classList.toggle("csw-tip-right", !onRightHalf);
+
+    // The tooltip is centered on the wheel; nudge it back in when the wheel
+    // sits close enough to the top or bottom edge to clip it.
+    const h = root.querySelector("#csw-tip").getBoundingClientRect().height;
+    if (h) {
+      const center = b.top + b.height / 2;
+      const lo = EDGE_PAD + h / 2;
+      const hi = Math.max(lo, window.innerHeight - EDGE_PAD - h / 2);
+      root.style.setProperty("--csw-tip-shift", Math.round(clamp(center, lo, hi) - center) + "px");
     }
-    root.style.left = Math.round(r.left + r.width / 2 - curSize / 2) + "px";
-    root.style.bottom = Math.round(window.innerHeight - r.top + AVATAR_GAP) + "px";
+  }
+
+  /* ── Drag ──────────────────────────────────────────── */
+
+  function initDrag(wheel) {
+    let pid = null, moved = false, startX = 0, startY = 0, offX = 0, offY = 0;
+
+    wheel.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0 || pid !== null) return;
+      const b = root.getBoundingClientRect();
+      suppressClick = false;   // clear any flag a previous drag left behind
+      pid = e.pointerId;
+      moved = false;
+      startX = e.clientX; startY = e.clientY;
+      offX = e.clientX - b.left; offY = e.clientY - b.top;
+      wheel.setPointerCapture(pid);
+      e.preventDefault();
+    });
+
+    wheel.addEventListener("pointermove", (e) => {
+      if (e.pointerId !== pid) return;
+      if (!moved) {
+        if (Math.hypot(e.clientX - startX, e.clientY - startY) < DRAG_SLOP) return;
+        moved = true;
+        root.classList.add("csw-dragging");
+        hideTip();
+      }
+      place(e.clientX - offX, e.clientY - offY, false);
+    });
+
+    const end = (e) => {
+      if (e.pointerId !== pid) return;
+      if (wheel.hasPointerCapture(pid)) wheel.releasePointerCapture(pid);
+      pid = null;
+      if (moved) {
+        root.classList.remove("csw-dragging");
+        savePos();
+        suppressClick = true;   // don't toggle the tooltip on the drag's click
+      }
+    };
+    wheel.addEventListener("pointerup", end);
+    wheel.addEventListener("pointercancel", end);
   }
 
   /* ── Chatbox ──────────────────────────────────────── */
@@ -368,7 +585,7 @@
 
   /* ── Tooltip ───────────────────────────────────────── */
 
-  function showTip()  { root.querySelector("#csw-tip").classList.add("csw-show"); expanded = true; clearTimeout(fadeTimer); }
+  function showTip()  { updateTipSide(); root.querySelector("#csw-tip").classList.add("csw-show"); expanded = true; clearTimeout(fadeTimer); }
   function hideTip()  { root.querySelector("#csw-tip").classList.remove("csw-show"); expanded = false; clearTimeout(fadeTimer); }
   function schedFade(){ clearTimeout(fadeTimer); fadeTimer = setTimeout(hideTip, FADE_MS); }
 
@@ -378,37 +595,39 @@
     document.body.appendChild(root);
 
     const wheel = root.querySelector("#csw-wheel");
-    wheel.style.width = curSize + "px";
-    wheel.style.height = curSize + "px";
     wheel.classList.add("csw-loading");
     renderWheel(null, null, null);
 
+    placeFrac(loadPos() || frac);
+    initDrag(wheel);
+
     wheel.addEventListener("mouseenter", () => {
-      anchorToAvatar();
+      if (root.classList.contains("csw-dragging")) return;
       showTip(); schedFade();
       debouncedRefresh();
     });
 
     wheel.addEventListener("click", (e) => {
       e.stopPropagation();
+      if (suppressClick) { suppressClick = false; return; }
       expanded ? hideTip() : (showTip(), schedFade());
     });
 
     root.addEventListener("mouseenter", () => { if (expanded) clearTimeout(fadeTimer); });
-    root.addEventListener("mouseleave", () => { hideTip(); });
+    root.addEventListener("mouseleave", () => { if (!root.classList.contains("csw-dragging")) hideTip(); });
     document.addEventListener("click", (e) => { if (expanded && !root.contains(e.target)) hideTip(); });
 
     // Event-delegated chatbox bindings (no observers, no polling)
     document.addEventListener("focusin", (e) => {
-      if (isChatbox(e.target)) { anchorToAvatar(); debouncedRefresh(); }
+      if (isChatbox(e.target)) debouncedRefresh();
     }, true);
     document.addEventListener("click", (e) => {
-      if (isChatbox(e.target)) { anchorToAvatar(); debouncedRefresh(); }
+      if (isChatbox(e.target)) debouncedRefresh();
     }, true);
 
-    window.addEventListener("resize", anchorToAvatar);
+    // Keep the wheel on screen (and correctly scaled) when the window changes.
+    window.addEventListener("resize", () => placeFrac(frac));
 
-    anchorToAvatar();
     triggerRefresh();
   }
 
