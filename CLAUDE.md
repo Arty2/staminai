@@ -22,7 +22,7 @@ content.js      Everything: rendering, placement, drag, API access, backoff.
 content.css     Styling. Uses Claude's own CSS custom properties with fallbacks.
 icons/          16/32/48/128 PNGs (referenced by the manifest) + the SVG master.
 build.sh        Packages the three artifacts. Pure bash + zip + awk.
-.github/workflows/build.yml   Builds and releases on a `v*` tag push.
+.github/workflows/build.yml   Releases on a new manifest version on `main`, or a `v*` tag push.
 ```
 
 ## Commands
@@ -55,8 +55,12 @@ npx web-ext lint                          # AMO's own linter, if network is avai
   double-quoted JS string literal, escaping backslashes, double quotes and
   newlines. If you ever put a backtick, `${`, or a `</script` sequence in the
   CSS, re-run `node --check dist/staminai.user.js` before trusting it.
-- **CI only fires on `v*` tags.** There is no PR/push validation job. If you
-  change `build.sh`, run it locally — CI will not catch a break until release.
+- **Releases are cut from `manifest.json`.** Every push to `main` checks
+  whether `v<version>` exists; if not, CI builds and publishes a release,
+  creating the tag itself. Merging a version bump *is* the release — so bump
+  only when you mean to ship. Pushing a `v*` tag by hand still works too.
+  There is no PR validation job: if you change `build.sh`, run it locally —
+  CI will not catch a break until release.
 
 ## Architecture
 
