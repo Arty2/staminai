@@ -4,6 +4,19 @@ All notable changes to staminai are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Removed
+- **Claude Design ring and tooltip row.** Claude Design no longer has its own weekly allowance; its activity counts toward the plan's shared limits. The dotted outer ring is kept in the code, switched off (`OUTER_ENABLED`), for a future separate meter or a credit balance.
+
+### Changed
+- **Tooltip palette** fixed to Claude's dark popover colours: background `#20201f`, border `#373736`, text `#f0efeb`.
+- **Organization name** in the tooltip drops the trailing "'s Organization" and is drawn in the border colour.
+- **Countdown clock** is smaller, with more clearance from the wheel edge.
+
+### Fixed
+- **Refresh spinner** spun about the SVG's top-left corner instead of the wheel centre, and orbited outside the wheel. It now pivots on the centre and sits just inside the rim with a thinner stroke.
+
 ## [2.3.0] — 2026-09-16
 
 ### Added
